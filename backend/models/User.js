@@ -1,35 +1,41 @@
+// models/User.js - Version sans middleware
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema({
-  nom: { type: String, required: true },
-  prenom: { type: String, required: true },
-  email: { type: String, unique: true, required: true },
-  mdp: { type: String, required: true },
-  image: { type: String },
+  nom: { 
+    type: String, 
+    required: [true, "Le nom est requis"],
+    trim: true 
+  },
+  prenom: { 
+    type: String, 
+    required: [true, "Le prénom est requis"],
+    trim: true 
+  },
+  email: { 
+    type: String, 
+    unique: true, 
+    required: [true, "L'email est requis"],
+    lowercase: true,
+    trim: true
+  },
+  mdp: { 
+    type: String, 
+    required: [true, "Le mot de passe est requis"]
+  },
+  image: { 
+    type: String,
+    default: null 
+  },
   role: {
     type: String,
-    enum: ["administrateur", "étudiant", "enseignant"],
-    required: true,
-    default: "étudiant"
+    enum: ["administrateur", "etudiant", "enseignant"],
+    default: "etudiant"
   }
-}, { timestamps: true });
-
-// Hash du mot de passe avant sauvegarde
-userSchema.pre("save", async function(next) {
-  if (!this.isModified("mdp")) return next();
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.mdp = await bcrypt.hash(this.mdp, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+}, { 
+  timestamps: true 
 });
 
-// Méthode pour comparer les mots de passe
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.mdp);
-};
+// PAS DE MIDDLEWARE PRE('SAVE') !
 
 module.exports = mongoose.model("User", userSchema);

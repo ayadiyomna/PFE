@@ -1,145 +1,104 @@
-// Home.jsx - INLINE STYLES (FONCTIONNE DIRECT)
-import { useEffect, useState } from "react";
-import axios from "axios";
-import CourseCard from "../components/CourseCard";
+import { Link } from "react-router-dom";
+import bg from "../assets/bg.jpg";
 
 function Home() {
-  const [cours, setCours] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    axios.get("http://localhost:5000/api/cours/courslist")
-      .then(res => setCours(res.data.data || res.data))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
-  }, []);
 
   const heroStyle = {
-    backgroundImage: "url('https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=1800&q=80')",
+    backgroundImage: `url(${bg})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
-    minHeight: "70vh",
-    position: "relative"
+    minHeight: "80vh",
+    position: "relative",
+    display: "flex",
+    alignItems: "center"
   };
 
   return (
-    <div style={{ 
-      minHeight: "100vh", 
-      backgroundColor: "#f9fafb",
-      fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif"
-    }}>
-      {/* Header */}
+    <div style={{ minHeight: "100vh", background: "#f9fafb", fontFamily: "'Poppins', sans-serif" }}>
+
+      {/* HEADER */}
       <header style={{
-        backgroundColor: "white",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-        borderTop: "4px solid #10b981",
-        padding: "1rem 0"
+        background: "white",
+        padding: "1rem 2rem",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        boxShadow: "0 2px 5px rgba(0,0,0,0.05)"
       }}>
-        <div style={{
-          maxWidth: "1280px",
-          margin: "0 auto",
-          padding: "0 1.5rem",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center"
-        }}>
-          <h1 style={{
-            fontSize: "2rem",
-            fontWeight: "900",
-            color: "#047857"
-          }}>Safoua Academy</h1>
-          <button style={{
-            backgroundColor: "#10b981",
-            color: "white",
-            padding: "0.75rem 1.5rem",
-            borderRadius: "0.5rem",
-            border: "none",
-            fontWeight: "600",
-            cursor: "pointer"
-          }}>Commencer</button>
+        <h1 style={{ color: "#059669", fontWeight: "800" }}>Safoua Academy</h1>
+
+        <div style={{ display: "flex", gap: "1rem" }}>
+          <Link to="/login" style={{ textDecoration: "none", color: "#111827", fontWeight: "600" }}>
+            Login
+          </Link>
+
+          <Link to="/register">
+            <button style={{
+              background: "#10b981",
+              color: "white",
+              border: "none",
+              padding: "0.6rem 1.2rem",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "600"
+            }}>
+              Register
+            </button>
+          </Link>
         </div>
       </header>
 
-      {/* Hero */}
+      {/* HERO */}
       <section style={heroStyle}>
         <div style={{
           position: "absolute",
           inset: 0,
-          background: "linear-gradient(to right, rgba(6,78,59,0.7), rgba(5,63,49,0.4), rgba(0,0,0,0.2))"
+          background: "rgba(0,0,0,0.5)"
         }} />
+
         <div style={{
           position: "relative",
-          padding: "5rem 1.5rem"
+          padding: "2rem",
+          color: "white",
+          maxWidth: "800px",
+          marginLeft: "5%"
         }}>
-          <div style={{
-            maxWidth: "1280px",
-            margin: "0 auto"
-          }}>
-            <h2 style={{
-              fontSize: "3rem",
-              fontWeight: "900",
-              color: "white",
-              marginBottom: "1rem",
-              textShadow: "2px 2px 4px rgba(0,0,0,0.5)"
-            }}>
-              Maîtrisez le Coran et l'Arabe
-            </h2>
-            <p style={{
-              fontSize: "1.25rem",
-              color: "rgba(255,255,255,0.9)",
-              marginBottom: "2rem"
-            }}>
-              Apprentissage intelligent avec IA
-            </p>
-            <button style={{
-              backgroundColor: "#10b981",
-              color: "white",
-              padding: "1rem 2rem",
-              borderRadius: "0.75rem",
-              fontSize: "1.125rem",
-              fontWeight: "600",
-              border: "none",
-              cursor: "pointer",
-              boxShadow: "0 10px 20px rgba(16,185,129,0.3)"
-            }}>
-              Commencer Gratuitement
-            </button>
+          <h2 style={{ fontSize: "3rem", fontWeight: "900" }}>
+            Maîtrisez le Coran et l'Arabe
+          </h2>
+
+          <p style={{ fontSize: "1.2rem", marginTop: "1rem" }}>
+            Plateforme intelligente avec accompagnement personnalisé
+          </p>
+
+          <div style={{ marginTop: "2rem", display: "flex", gap: "1rem" }}>
+            <Link to="/Cours">
+              <button style={{
+                background: "#10b981",
+                border: "none",
+                padding: "1rem 1.5rem",
+                borderRadius: "10px",
+                color: "white",
+                fontWeight: "600",
+                cursor: "pointer"
+              }}>
+                Voir les Cours
+              </button>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Cours */}
-      <section style={{
-        padding: "4rem 1.5rem",
-        backgroundColor: "#f8fafc"
+      {/* FOOTER */}
+      <footer style={{
+        background: "#1f2937",
+        color: "white",
+        textAlign: "center",
+        padding: "1rem"
       }}>
-        <div style={{
-          maxWidth: "1280px",
-          margin: "0 auto",
-          textAlign: "center"
-        }}>
-          <h3 style={{
-            fontSize: "2.5rem",
-            fontWeight: "900",
-            color: "#1f2937",
-            marginBottom: "3rem"
-          }}>Nos Cours</h3>
-          
-          {loading ? (
-            <p>Chargement...</p>
-          ) : (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-              gap: "2rem"
-            }}>
-              {cours.map(cour => (
-                <CourseCard key={cour._id} cour={cour} />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+        © 2026 Safoua Academy
+      </footer>
+
     </div>
   );
 }

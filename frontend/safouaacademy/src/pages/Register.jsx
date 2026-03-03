@@ -1,493 +1,271 @@
-// Register.jsx COMPLET ✅ CORRIGÉ + STYLES DU DÉBUT
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { registerUser } from "../services/authService";
+import { User, Mail, Lock, Eye, EyeOff, ShieldCheck, GraduationCap } from "lucide-react";
 
-export default function Register() {
+function Register() {
   const [formData, setFormData] = useState({
-    nom: "", prenom: "", email: "", mdp: "", confirmMdp: "", 
-    role: "enseignant", acceptTerms: false 
+    nom: "",
+    prenom: "",
+    email: "",
+    mdp: "",
+    confirmMdp: "",
+    role: "etudiant",
+    acceptTerms: false
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({ 
-      ...formData, 
-      [e.target.name]: e.target.type === "checkbox" ? e.target.checked : e.target.value 
-    });
+    const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    
+
     if (formData.mdp !== formData.confirmMdp) {
       return setError("Les mots de passe ne correspondent pas");
     }
     if (!formData.acceptTerms) {
-      return setError("Vous devez accepter les conditions");
+      return setError("Vous devez accepter les conditions d'utilisation");
     }
-    
+
     try {
       setLoading(true);
       const res = await registerUser(formData);
-      
-      // ✅ CORRIGÉ pour votre backend structure
+
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.data));
-      
-      // ✅ CORRIGÉ - navigation par role
+
       const role = res.data.data.role;
-      if (role === "administrateur") return navigate("/admin");
-      if (role === "enseignant") return navigate("/enseignant");
-      navigate("/etudiant");
-      
+      if (role === "administrateur") navigate("/admin");
+      else if (role === "enseignant") navigate("/enseignant");
+      else navigate("/etudiant");
     } catch (error) {
-      // ✅ Gestion axios error
-      const message = error.response?.data?.message || error.message || "Erreur inscription";
-      setError(message);
+      setError(
+        error.response?.data?.message || 
+        error.message || 
+        "Erreur lors de l'inscription"
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // STYLES DU DÉBUT (IDENTIQUES)
-  const rootStyle = {
-    minHeight: "100vh", 
-    padding: "80px 20px",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-    display: "flex", 
-    alignItems: "center",
-    justifyContent: "center"
-  };
-
-  const cardStyle = {
-    width: "100%", 
-    maxWidth: "900px", 
-    margin: "0 auto",
-    background: "white", 
-    borderRadius: "24px",
-    boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
-    overflow: "hidden"
-  };
-
-  const gridStyle = { 
-    display: "grid", 
-    gridTemplateColumns: "1fr 1fr", 
-    minHeight: "650px" 
-  };
-
-  const heroStyle = {
-    padding: "60px 50px", 
-    background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-    color: "white", 
-    position: "relative", 
-    overflow: "hidden"
-  };
-
-  const badgeStyle = { 
-    display: "inline-flex", 
-    alignItems: "center", 
-    gap: "12px", 
-    background: "rgba(255,255,255,0.2)", 
-    padding: "12px 20px", 
-    borderRadius: "50px",
-    fontSize: "14px", 
-    fontWeight: "700", 
-    backdropFilter: "blur(10px)",
-    border: "1px solid rgba(255,255,255,0.3)"
-  };
-
-  const sparkle = { 
-    width: "12px", 
-    height: "12px", 
-    background: "#ffd700", 
-    borderRadius: "50%",
-    boxShadow: "0 0 15px rgba(255,215,0,0.6)"
-  };
-
-  const titleStyle = { 
-    fontSize: "40px", 
-    fontWeight: "900", 
-    margin: "30px 0 15px 0", 
-    lineHeight: 1.1 
-  };
-
-  const subtitleStyle = { 
-    fontSize: "18px", 
-    opacity: 0.9, 
-    marginBottom: "40px",
-    maxWidth: "300px"
-  };
-
-  const featuresStyle = { 
-    display: "flex", 
-    flexDirection: "column", 
-    gap: "20px",
-    marginTop: "30px"
-  };
-
-  const featureItem = { 
-    display: "flex", 
-    alignItems: "center", 
-    gap: "15px", 
-    padding: "20px", 
-    background: "rgba(255,255,255,0.15)", 
-    borderRadius: "16px", 
-    fontSize: "16px",
-    backdropFilter: "blur(10px)"
-  };
-
-  const formContainer = { 
-    padding: "60px 50px" 
-  };
-
-  const headerStyle = { 
-    display: "flex", 
-    justifyContent: "space-between", 
-    alignItems: "center", 
-    marginBottom: "40px" 
-  };
-
-  const tagStyle = { 
-    fontSize: "12px", 
-    textTransform: "uppercase", 
-    letterSpacing: "2px", 
-    color: "#64748b", 
-    fontWeight: "700",
-    display: "block"
-  };
-
-  const sectionTitle = { 
-    fontSize: "28px", 
-    fontWeight: "800", 
-    color: "#1e293b", 
-    margin: "8px 0 0 0" 
-  };
-
-  const avatarStyle = { 
-    width: "60px", 
-    height: "60px", 
-    background: "#1e293b", 
-    borderRadius: "20px", 
-    display: "flex", 
-    alignItems: "center", 
-    justifyContent: "center", 
-    fontSize: "24px",
-    boxShadow: "0 10px 20px rgba(0,0,0,0.2)"
-  };
-
-  const errorStyle = { 
-    background: "#fee2e2", 
-    border: "1px solid #fecaca", 
-    borderRadius: "12px", 
-    padding: "16px 20px", 
-    color: "#dc2626", 
-    fontSize: "14px", 
-    marginBottom: "25px", 
-    display: "flex", 
-    alignItems: "center", 
-    gap: "10px" 
-  };
-
-  const formStyle = { 
-    display: "grid", 
-    gap: "24px" 
-  };
-
-  const rowStyle = { 
-    display: "grid", 
-    gridTemplateColumns: "1fr 1fr", 
-    gap: "24px" 
-  };
-
-  const labelStyle = { 
-    display: "block", 
-    fontSize: "14px", 
-    fontWeight: "600", 
-    color: "#1e293b", 
-    marginBottom: "8px" 
-  };
-
-  const inputWrapper = { 
-    position: "relative" 
-  };
-
-  const iconStyle = { 
-    position: "absolute", 
-    left: "20px", 
-    top: "50%", 
-    transform: "translateY(-50%)", 
-    fontSize: "20px", 
-    color: "#94a3b8", 
-    zIndex: 1 
-  };
-
-  const inputStyle = { 
-    width: "100%", 
-    padding: "18px 20px 18px 60px", 
-    borderRadius: "16px", 
-    border: "1px solid #e2e8f0", 
-    background: "white", 
-    fontSize: "15px", 
-    color: "#1e293b",
-    outline: "none", 
-    boxShadow: "0 1px 3px rgba(0,0,0,0.1)", 
-    transition: "all 0.2s",
-    fontFamily: "inherit"
-  };
-
-  const selectStyle = { 
-    ...inputStyle, 
-    paddingRight: "50px", 
-    backgroundImage: `url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMUw2IDZMMTIgMSIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==")`, 
-    backgroundRepeat: "no-repeat", 
-    backgroundPosition: "right 20px center", 
-    backgroundSize: "12px",
-    appearance: "none"
-  };
-
-  const checkboxStyle = { 
-    display: "flex", 
-    alignItems: "flex-start", 
-    gap: "12px", 
-    padding: "20px", 
-    background: "#f8fafc", 
-    borderRadius: "16px", 
-    border: "1px solid #e2e8f0", 
-    cursor: "pointer",
-    fontSize: "14px",
-    color: "#374151"
-  };
-
-  const checkboxInput = { 
-    width: "20px", 
-    height: "20px", 
-    marginTop: "2px", 
-    accentColor: "#10b981" 
-  };
-
-  const buttonStyle = { 
-    width: "100%", 
-    padding: "20px", 
-    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", 
-    color: "white", 
-    border: "none", 
-    borderRadius: "20px", 
-    fontSize: "18px", 
-    fontWeight: "700", 
-    cursor: "pointer", 
-    boxShadow: "0 10px 30px rgba(16,185,129,0.4)", 
-    transition: "all 0.3s",
-    fontFamily: "inherit"
-  };
-
-  const loginLinkStyle = { 
-    textAlign: "center", 
-    paddingTop: "25px", 
-    borderTop: "1px solid #e2e8f0", 
-    color: "#6b7280", 
-    fontSize: "15px" 
-  };
-
-  const linkStyle = { 
-    color: "#10b981", 
-    fontWeight: "700", 
-    textDecoration: "none" 
-  };
-
-  // Composants réutilisables
-  function InputField({ label, name, value, onChange, icon, type = "text", placeholder }) {
-    return (
-      <div style={{marginBottom: "8px"}}>
-        <label style={labelStyle}>{label}</label>
-        <div style={inputWrapper}>
-          <span style={iconStyle}>{icon}</span>
-          <input
-            name={name} 
-            type={type} 
-            value={value}
-            onChange={onChange} 
-            placeholder={placeholder}
-            required 
-            style={inputStyle}
-            onFocus={(e) => {
-              e.target.style.borderColor = "#10b981";
-              e.target.style.boxShadow = "0 0 0 3px rgba(16,185,129,0.1)";
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = "#e2e8f0";
-              e.target.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  function SelectField({ label, name, value, onChange, icon, options }) {
-    return (
-      <div style={{marginBottom: "8px"}}>
-        <label style={labelStyle}>{label}</label>
-        <div style={inputWrapper}>
-          <span style={iconStyle}>{icon}</span>
-          <select 
-            name={name} 
-            value={value} 
-            onChange={onChange} 
-            style={selectStyle} 
-            required
-          >
-            {options.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={rootStyle}>
-      <div style={cardStyle}>
-        <div style={gridStyle}>
-          {/* Hero */}
-          <div style={heroStyle}>
-            <div style={badgeStyle}>
-              <div style={sparkle} />
-              <span>Safoua Academy</span>
-            </div>
-            <h1 style={titleStyle}>CRÉER UN COMPTE</h1>
-            <p style={subtitleStyle}>Accédez aux formations disponibles</p>
-            <div style={featuresStyle}>
-              <div style={featureItem}>
-                <span style={{fontSize: "24px", marginRight: "15px"}}>✓</span>
-                <span>Profil vérifié</span>
-              </div>
-              <div style={featureItem}>
-                <span style={{fontSize: "24px", marginRight: "15px"}}>📧</span>
-                <span>Email confirmé</span>
-              </div>
-            </div>
+    <section className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
+      <div className="max-w-5xl w-full rounded-3xl overflow-hidden shadow-2xl border border-gray-100 bg-white grid md:grid-cols-2">
+
+        {/* LEFT SIDE */}
+        <div className="relative p-10 text-white bg-gradient-to-br from-emerald-600 via-teal-600 to-sky-600">
+          <div className="inline-flex items-center gap-3 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full border border-white/30">
+            <div className="w-3 h-3 bg-yellow-300 rounded-full shadow-lg shadow-yellow-300/50"></div>
+            <span className="font-bold text-sm">Safoua Academy</span>
           </div>
 
-          {/* Formulaire */}
-          <div style={formContainer}>
-            <div style={headerStyle}>
-              <div>
-                <span style={tagStyle}>INSCRIPTION</span>
-                <h3 style={sectionTitle}>Academy</h3>
-              </div>
-              <div style={avatarStyle}>👤</div>
+          <h2 className="text-4xl font-extrabold mt-8">CRÉER UN COMPTE</h2>
+          <p className="mt-4 text-white/90">
+            Rejoignez notre plateforme d'apprentissage
+          </p>
+
+          <div className="mt-8 space-y-4">
+            <div className="flex items-center gap-4 p-4 bg-white/15 backdrop-blur-sm rounded-2xl">
+              <ShieldCheck size={24} />
+              <span>Profil vérifié</span>
             </div>
-
-            {error && <div style={errorStyle}>⚠️ {error}</div>}
-
-            <form onSubmit={handleSubmit} style={formStyle}>
-              <div style={rowStyle}>
-                <InputField 
-                  label="Nom *" 
-                  name="nom" 
-                  value={formData.nom} 
-                  onChange={handleChange} 
-                  icon="👤" 
-                  placeholder="Dupont"
-                />
-                <InputField 
-                  label="Prénom *" 
-                  name="prenom" 
-                  value={formData.prenom} 
-                  onChange={handleChange} 
-                  icon="✏️" 
-                  placeholder="Jean"
-                />
-              </div>
-
-              <InputField 
-                label="Email *" 
-                name="email" 
-                type="email"
-                value={formData.email} 
-                onChange={handleChange}
-                icon="📧" 
-                placeholder="jean@academy.com"
-              />
-
-              <SelectField 
-                label="Profil *" 
-                name="role" 
-                value={formData.role} 
-                onChange={handleChange}
-                icon="🎓"
-                options={[
-                  {value: "etudiant", label: "Étudiant"},
-                  {value: "enseignant", label: "Enseignant"},
-                  {value: "administrateur", label: "Administrateur"}
-                ]}
-              />
-
-              <div style={rowStyle}>
-                <InputField 
-                  label="Mot de passe *" 
-                  name="mdp" 
-                  type="password"
-                  value={formData.mdp} 
-                  onChange={handleChange}
-                  icon="🔒" 
-                  placeholder="••••••••"
-                />
-                <InputField 
-                  label="Confirmer *" 
-                  name="confirmMdp" 
-                  type="password"
-                  value={formData.confirmMdp} 
-                  onChange={handleChange}
-                  icon="🔐" 
-                  placeholder="••••••••"
-                />
-              </div>
-
-              <label style={checkboxStyle}>
-                <input
-                  type="checkbox" 
-                  name="acceptTerms"
-                  checked={formData.acceptTerms}
-                  onChange={handleChange}
-                  style={checkboxInput}
-                />
-                <span>J'accepte les conditions d'utilisation</span>
-              </label>
-
-              <button 
-                type="submit" 
-                disabled={loading} 
-                style={buttonStyle}
-                onMouseEnter={(e) => {
-                  if (!loading) {
-                    e.target.style.transform = "translateY(-2px)";
-                    e.target.style.boxShadow = "0 15px 35px rgba(16,185,129,0.5)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!loading) {
-                    e.target.style.transform = "translateY(0)";
-                    e.target.style.boxShadow = "0 10px 30px rgba(16,185,129,0.4)";
-                  }
-                }}
-              >
-                {loading ? "⏳ Inscription..." : "✅ S'inscrire"}
-              </button>
-
-              <div style={loginLinkStyle}>
-                Déjà un compte ? <a href="/login" style={linkStyle}>Se connecter</a>
-              </div>
-            </form>
+            <div className="flex items-center gap-4 p-4 bg-white/15 backdrop-blur-sm rounded-2xl">
+              <GraduationCap size={24} />
+              <span>Accès aux formations</span>
+            </div>
+            <div className="flex items-center gap-4 p-4 bg-white/15 backdrop-blur-sm rounded-2xl">
+              <Mail size={24} />
+              <span>Email confirmé</span>
+            </div>
           </div>
         </div>
+
+        {/* RIGHT SIDE */}
+        <div className="p-10">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">
+                INSCRIPTION
+              </span>
+              <h3 className="text-2xl font-bold text-gray-900 mt-1">
+                Academy
+              </h3>
+            </div>
+            <div className="w-14 h-14 bg-gray-900 rounded-xl flex items-center justify-center text-2xl shadow-lg">
+              👤
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-100 text-red-700 p-4 rounded-xl mb-6 flex items-center gap-2 border border-red-200">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* NOM & PRENOM */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-semibold">Nom</label>
+                <div className="relative mt-2">
+                  <User className="absolute left-4 top-3 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    name="nom"
+                    value={formData.nom}
+                    onChange={handleChange}
+                    placeholder="Dupont"
+                    required
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-semibold">Prénom</label>
+                <div className="relative mt-2">
+                  <User className="absolute left-4 top-3 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    name="prenom"
+                    value={formData.prenom}
+                    onChange={handleChange}
+                    placeholder="Jean"
+                    required
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* EMAIL */}
+            <div>
+              <label className="text-sm font-semibold">Email</label>
+              <div className="relative mt-2">
+                <Mail className="absolute left-4 top-3 text-gray-400" size={16} />
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="jean@academy.com"
+                  required
+                  className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* ROLE */}
+            <div>
+              <label className="text-sm font-semibold">Rôle</label>
+              <div className="relative mt-2">
+                <GraduationCap className="absolute left-4 top-3 text-gray-400" size={16} />
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="w-full pl-11 pr-10 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 appearance-none bg-white"
+                >
+                  <option value="etudiant">Étudiant</option>
+                  <option value="enseignant">Enseignant</option>
+                  <option value="administrateur">Administrateur</option>
+                </select>
+              </div>
+            </div>
+
+            {/* MOT DE PASSE */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-semibold">Mot de passe</label>
+                <div className="relative mt-2">
+                  <Lock className="absolute left-4 top-3 text-gray-400" size={16} />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="mdp"
+                    value={formData.mdp}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    required
+                    className="w-full pl-11 pr-11 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-3 text-gray-500"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-semibold">Confirmer</label>
+                <div className="relative mt-2">
+                  <Lock className="absolute left-4 top-3 text-gray-400" size={16} />
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmMdp"
+                    value={formData.confirmMdp}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    required
+                    className="w-full pl-11 pr-11 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-3 text-gray-500"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* CONDITIONS */}
+            <label className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-200 cursor-pointer">
+              <input
+                type="checkbox"
+                name="acceptTerms"
+                checked={formData.acceptTerms}
+                onChange={handleChange}
+                className="w-5 h-5 mt-0.5 accent-emerald-600"
+              />
+              <span className="text-sm text-gray-600">
+                J'accepte les conditions d'utilisation
+              </span>
+            </label>
+
+            {/* BUTTON */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 rounded-2xl font-bold text-white shadow-lg bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 transition disabled:opacity-50 text-lg"
+            >
+              {loading ? "⏳ Inscription..." : "✅ S'inscrire"}
+            </button>
+
+            {/* LOGIN LINK */}
+            <p className="text-center text-sm pt-5 border-t border-gray-200">
+              Déjà un compte ?{" "}
+              <Link to="/login" className="text-emerald-600 font-semibold hover:underline">
+                Se connecter
+              </Link>
+            </p>
+          </form>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
+
+export default Register;

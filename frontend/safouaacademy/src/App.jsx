@@ -5,23 +5,20 @@ import AdminDashboard from "./pages/AdminDashboard";
 import EtudiantDashboard from "./pages/EtudiantDashboard";
 import EnseignantDashboard from "./pages/EnseignantDashboard";
 import Home from "./pages/Home";
+import Cours from "./pages/Cours";
 
 function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-indigo-100">
         <Routes>
-          {/* ✅ Pages publiques */}
-          <Route path="/" element={<Home />} />                    {/* ACCUEIL ✅ */}
+          <Route path="/" element={<Home />} />                    
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          
-          {/* ✅ Dashboards - SANS protection pour tests */}
+          <Route path="/cours" element={<Cours/>}/>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/etudiant" element={<EtudiantDashboard />} />
           <Route path="/enseignant" element={<EnseignantDashboard />} />
-          
-          {/* ✅ 404 PREMIUM */}
           <Route path="*" element={
             <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-red-50 flex items-center justify-center px-4 py-12">
               <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl text-center p-12 border-t-8 border-red-500">
