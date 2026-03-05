@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { loginUser } from "../services/authService";
-import { Eye, EyeOff, Mail, Lock, ShieldCheck } from "lucide-react";
 
 function Login() {
   const [formData, setFormData] = useState({
     email: "",
-    mdp: "",
+    password: "",
     role: "etudiant",
   });
 
@@ -23,27 +21,41 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     try {
-      setLoading(true);
-      const res = await loginUser(formData);
+      // Simuler une connexion
+      setTimeout(() => {
+        // Vérification simple (à remplacer par un vrai appel API)
+        if (formData.email && formData.password) {
+          const user = {
+            id: 1,
+            nom: "Utilisateur",
+            email: formData.email,
+            role: formData.role
+          };
+          
+          localStorage.setItem("token", "fake-jwt-token");
+          localStorage.setItem("user", JSON.stringify(user));
 
-      localStorage.setItem("token", res.token);
-      localStorage.setItem("user", JSON.stringify(res.data));
-
-      navigate(
-        res.data.role === "administrateur"
-          ? "/admin"
-          : res.data.role === "enseignant"
-          ? "/enseignant"
-          : "/etudiant"
-      );
+          // Redirection selon le rôle
+          switch(formData.role) {
+            case "administrateur":
+              navigate("/admin");
+              break;
+            case "enseignant":
+              navigate("/enseignant");
+              break;
+            default:
+              navigate("/etudiant");
+          }
+        } else {
+          setError("Email ou mot de passe incorrect");
+        }
+        setLoading(false);
+      }, 1000);
     } catch (error) {
-      setError(
-        error.response?.data?.message ||
-          "Email ou mot de passe incorrect"
-      );
-    } finally {
+      setError("Erreur de connexion");
       setLoading(false);
     }
   };
@@ -54,19 +66,19 @@ function Login() {
 
         {/* LEFT SIDE */}
         <div className="relative p-10 text-white bg-gradient-to-br from-emerald-600 via-teal-600 to-sky-600">
-          <h2 className="text-4xl font-extrabold">WELCOME BACK</h2>
+          <h2 className="text-4xl font-extrabold">BIENVENUE</h2>
           <p className="mt-4 text-white/90">
             Accès aux cours, suivi vocal et espace enseignants.
           </p>
 
           <div className="mt-8 space-y-3 text-sm">
             <p className="flex items-center gap-2">
-              <ShieldCheck size={16} />
+              <span>🔒</span>
               Connexion sécurisée
             </p>
             <p className="flex items-center gap-2">
-              <Mail size={16} />
-              Support: support@demo.com
+              <span>📧</span>
+              Support: support@safoua.com
             </p>
           </div>
         </div>
@@ -74,13 +86,13 @@ function Login() {
         {/* RIGHT SIDE */}
         <div className="p-10">
           <h3 className="text-2xl font-bold text-gray-900">
-            Login Account
+            Connexion
           </h3>
           <p className="text-gray-600 mb-6">Safoua Academy</p>
 
           {error && (
             <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-4">
-              {error}
+              ⚠️ {error}
             </div>
           )}
 
@@ -88,11 +100,9 @@ function Login() {
 
             {/* EMAIL */}
             <div>
-              <label className="text-sm font-semibold">
-                Email
-              </label>
+              <label className="text-sm font-semibold">Email</label>
               <div className="relative mt-2">
-                <Mail className="absolute left-4 top-3 text-gray-400" size={16} />
+                <span className="absolute left-4 top-3 text-gray-400">📧</span>
                 <input
                   type="email"
                   name="email"
@@ -104,10 +114,10 @@ function Login() {
                 />
               </div>
             </div>
+
+            {/* ROLE */}
             <div>
-              <label className="text-sm font-semibold">
-                Rôle
-              </label>
+              <label className="text-sm font-semibold">Rôle</label>
               <select
                 name="role"
                 value={formData.role}
@@ -116,18 +126,19 @@ function Login() {
               >
                 <option value="etudiant">Étudiant</option>
                 <option value="enseignant">Enseignant</option>
+                <option value="administrateur">Administrateur</option>
               </select>
             </div>
+
+            {/* PASSWORD */}
             <div>
-              <label className="text-sm font-semibold">
-                Mot de passe
-              </label>
+              <label className="text-sm font-semibold">Mot de passe</label>
               <div className="relative mt-2">
-                <Lock className="absolute left-4 top-3 text-gray-400" size={16} />
+                <span className="absolute left-4 top-3 text-gray-400">🔒</span>
                 <input
                   type={showPassword ? "text" : "password"}
-                  name="mdp"
-                  value={formData.mdp}
+                  name="password"
+                  value={formData.password}
                   onChange={handleChange}
                   placeholder="Votre mot de passe"
                   required
@@ -138,10 +149,11 @@ function Login() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-3 text-gray-500"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? "👁️" : "👁️‍🗨️"}
                 </button>
               </div>
             </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -149,16 +161,8 @@ function Login() {
             >
               {loading ? "Connexion..." : "Se connecter"}
             </button>
-            <div className="flex justify-between text-sm text-gray-600">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" />
-                Remember me
-              </label>
-              <button type="button" className="font-semibold">
-                Forgot?
-              </button>
-            </div>
           </form>
+
           <p className="text-center text-sm mt-6">
             Pas de compte ?{" "}
             <Link to="/register" className="text-emerald-600 font-semibold">

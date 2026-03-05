@@ -7,7 +7,7 @@ const generateToken = (id) => {
   return jwt.sign(
     { id }, 
     process.env.JWT_SECRET || "secret_temporaire_123", 
-    { expiresIn: "30d" }
+    { expiresIn: "30d" },
   );
 };
 
@@ -38,22 +38,15 @@ const register = async (req, res) => {
       });
     }
     
-    // HACHER LE MOT DE PASSE ICI
-    console.log("🔐 Hachage du mot de passe...");
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(mdp, salt);
-    console.log("✅ Mot de passe haché avec succès");
-
-    // Créer l'utilisateur avec le mot de passe déjà haché
     const user = await User.create({
       nom,
       prenom,
       email,
-      mdp: hashedPassword, // Important: utiliser le mot de passe haché
+      mdp: hashedPassword,
       role: role || "etudiant"
     });
-
-    console.log("✅ Utilisateur créé avec ID:", user._id);
 
     const token = generateToken(user._id);
 
@@ -70,7 +63,6 @@ const register = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Erreur register:", error);
     
     if (error.code === 11000) {
       return res.status(400).json({ 
@@ -85,12 +77,8 @@ const register = async (req, res) => {
     });
   }
 };
-
-// LOGIN
 const login = async (req, res) => {
   try {
-    console.log("🔐 Login - Email:", req.body.email);
-
     const { email, mdp } = req.body;
     
     if (!email || !mdp) {
@@ -99,8 +87,6 @@ const login = async (req, res) => {
         message: "Email et mot de passe requis" 
       });
     }
-    
-    // Chercher l'utilisateur avec le mot de passe
     const user = await User.findOne({ email }).select("+mdp");
     
     if (!user) {
@@ -109,20 +95,14 @@ const login = async (req, res) => {
         message: "Email ou mot de passe incorrect" 
       });
     }
-    
-    // Comparer les mots de passe
-    console.log("🔍 Vérification du mot de passe...");
     const isMatch = await bcrypt.compare(mdp, user.mdp);
     
     if (!isMatch) {
-      console.log("❌ Mot de passe incorrect");
       return res.status(401).json({ 
         success: false,
         message: "Email ou mot de passe incorrect" 
       });
     }
-    
-    console.log("✅ Mot de passe correct");
     
     const token = generateToken(user._id);
     
@@ -139,15 +119,12 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Erreur login:", error);
     res.status(500).json({ 
       success: false,
       message: "Erreur lors de la connexion" 
     });
   }
 };
-
-// Lister tous les utilisateurs
 const listerutilisateurs = async (req, res) => {
   try {
     const users = await User.find().select("-mdp");
@@ -163,8 +140,6 @@ const listerutilisateurs = async (req, res) => {
     });
   }
 };
-
-// Get utilisateur par ID
 const getutilisateurById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-mdp");
@@ -185,11 +160,8 @@ const getutilisateurById = async (req, res) => {
     });
   }
 };
-
-// Update utilisateur
 const updateutilisateur = async (req, res) => {
   try {
-    // Si le mot de passe est fourni, le hacher
     if (req.body.mdp) {
       const salt = await bcrypt.genSalt(10);
       req.body.mdp = await bcrypt.hash(req.body.mdp, salt);
@@ -219,8 +191,6 @@ const updateutilisateur = async (req, res) => {
     });
   }
 };
-
-// Delete utilisateur
 const deleteutilisateur = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);

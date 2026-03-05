@@ -1,4 +1,3 @@
-
 import * as authService from './authService'; 
 import axios from 'axios';
 
@@ -9,7 +8,6 @@ export const getCoursList = async () => {
     const response = await axios.get(`${API_URL}/courslist`);
     return response.data;
   } catch (error) {
-    console.error('Erreur chargement cours:', error.response?.data || error.message);
     throw error;
   }
 };

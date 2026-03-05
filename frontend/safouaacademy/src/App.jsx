@@ -6,6 +6,11 @@ import EtudiantDashboard from "./pages/EtudiantDashboard";
 import EnseignantDashboard from "./pages/EnseignantDashboard";
 import Home from "./pages/Home";
 import Cours from "./pages/Cours";
+import CourseDetail from "./pages/CoursDetails";
+import LessonPlayer from "./pages/LessonPlayer";
+import ProgressQuizPage from "./pages/ProgressQuizPage";
+import CertificatesPage from "./pages/CertificatesPage";
+import CreerCours from './components/CreerCours';
 
 function App() {
   return (
@@ -16,9 +21,16 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/cours" element={<Cours/>}/>
+          <Route path="/CourseDetail" element={<CourseDetail></CourseDetail>}></Route>
+          <Route path="/certificat" element={<CertificatesPage/>}/>
+          <Route path="/lecon" element={<LessonPlayer/>}>
+          </Route>
+          <Route path="/quizz" element={<ProgressQuizPage/>}></Route>
+
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/etudiant" element={<EtudiantDashboard />} />
           <Route path="/enseignant" element={<EnseignantDashboard />} />
+          <Route path="/enseignant/creer-cours" element={<CreerCours />}/>
           <Route path="*" element={
             <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-red-50 flex items-center justify-center px-4 py-12">
               <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl text-center p-12 border-t-8 border-red-500">
