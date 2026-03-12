@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function CreerCours() {
   const navigate = useNavigate();
@@ -26,6 +28,60 @@ function CreerCours() {
   const levels = ["Débutant", "Intermédiaire", "Expert"];
   const languages = ["Français", "Arabe", "Anglais"];
 
+  // ✅ FONCTION POUR NETTOYER LE LOCALSTORAGE SI NÉCESSAIRE
+  const cleanLocalStorage = () => {
+    try {
+      // Supprimer les anciennes données temporaires
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.includes('temp_') || key?.includes('cache_')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Limiter la taille des courses
+      const courses = JSON.parse(localStorage.getItem('teacherCourses') || '[]');
+      if (courses.length > 30) {
+        const trimmed = courses.slice(0, 30);
+        localStorage.setItem('teacherCourses', JSON.stringify(trimmed));
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Erreur nettoyage localStorage:", error);
+      return false;
+    }
+  };
+
+  // ✅ FONCTION POUR SAUVEGARDER AVEC GESTION QUOTA
+  const safeLocalStorageSet = (key, value) => {
+    try {
+      // Essayer de sauvegarder normalement
+      localStorage.setItem(key, value);
+      return true;
+    } catch (error) {
+      if (error.name === 'QuotaExceededError') {
+        toast.warning("⚠️ Espace de stockage insuffisant, nettoyage en cours...");
+        
+        // Nettoyer et réessayer
+        if (cleanLocalStorage()) {
+          try {
+            localStorage.setItem(key, value);
+            toast.success("✅ Sauvegarde réussie après nettoyage");
+            return true;
+          } catch (retryError) {
+            toast.error("❌ Toujours pas assez d'espace. Supprimez d'anciens cours.");
+            return false;
+          }
+        }
+      }
+      toast.error("❌ Erreur de sauvegarde");
+      return false;
+    }
+  };
+
   // ✅ GESTION CHANGE INPUTS
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -47,6 +103,12 @@ function CreerCours() {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Vérifier la taille de l'image (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error("❌ L'image ne doit pas dépasser 2MB");
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({
@@ -73,7 +135,13 @@ function CreerCours() {
     if (!formData.price || formData.price <= 0) newErrors.price = "Le prix doit être supérieur à 0";
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    
+    if (Object.keys(newErrors).length > 0) {
+      toast.error("❌ Veuillez corriger les erreurs du formulaire");
+      return false;
+    }
+    
+    return true;
   };
 
   // ✅ SOUMISSION FORMULAIRE
@@ -86,25 +154,57 @@ function CreerCours() {
     
     // ✅ SIMULATION API
     setTimeout(() => {
-      console.log("Nouveau cours créé:", formData);
-      
-      // ✅ AJOUT AU LOCALSTORAGE (simulation)
-      const courses = JSON.parse(localStorage.getItem('teacherCourses') || '[]');
-      const newCourse = {
-        id: Date.now(),
-        ...formData,
-        createdAt: new Date().toLocaleDateString('fr-FR')
-      };
-      courses.unshift(newCourse);
-      localStorage.setItem('teacherCourses', JSON.stringify(courses));
-      
-      setLoading(false);
-      setSuccess(true);
-      
-      // ✅ REDIRECTION APRÈS 2s
-      setTimeout(() => {
-        navigate('/enseignant');
-      }, 2000);
+      try {
+        console.log("Nouveau cours créé:", formData);
+        
+        // ✅ RÉCUPÉRER LES COURS EXISTANTS
+        let courses = [];
+        try {
+          courses = JSON.parse(localStorage.getItem('teacherCourses') || '[]');
+        } catch {
+          courses = [];
+        }
+
+        // ✅ CRÉER LE NOUVEAU COURS
+        const newCourse = {
+          id: Date.now(),
+          ...formData,
+          createdAt: new Date().toLocaleDateString('fr-FR'),
+          students: 0,
+          rating: 0,
+          status: "Brouillon"
+        };
+
+        // ✅ AJOUTER AU DÉBUT DU TABLEAU
+        courses.unshift(newCourse);
+
+        // ✅ LIMITER LE NOMBRE DE COURS (garder les 50 plus récents)
+        if (courses.length > 50) {
+          courses = courses.slice(0, 50);
+          toast.info("📚 Anciens cours nettoyés automatiquement");
+        }
+
+        // ✅ SAUVEGARDER AVEC GESTION QUOTA
+        const saved = safeLocalStorageSet('teacherCourses', JSON.stringify(courses));
+        
+        if (saved) {
+          toast.success("✅ Cours créé avec succès !");
+          setSuccess(true);
+          
+          // ✅ REDIRECTION APRÈS 2s
+          setTimeout(() => {
+            navigate('/enseignant');
+          }, 2000);
+        } else {
+          toast.error("❌ Échec de la sauvegarde");
+          setLoading(false);
+        }
+        
+      } catch (error) {
+        console.error("Erreur lors de la création:", error);
+        toast.error("❌ Erreur lors de la création du cours");
+        setLoading(false);
+      }
     }, 1500);
   };
 
@@ -113,11 +213,25 @@ function CreerCours() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('role');
+    toast.success("👋 Déconnexion réussie");
     navigate('/', { replace: true });
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+
       {/* HEADER IDENTIQUE */}
       <header className="bg-white shadow-md border-t-4 border-emerald-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -309,7 +423,7 @@ function CreerCours() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Prix (€) *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Prix (DT) *</label>
                     <input
                       type="number"
                       name="price"
@@ -330,7 +444,9 @@ function CreerCours() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-4">Image du cours (optionnel)</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Image du cours (max 2MB)
+                    </label>
                     <input
                       type="file"
                       accept="image/*"

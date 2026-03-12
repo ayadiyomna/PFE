@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -28,9 +30,13 @@ function Register() {
     setError("");
 
     if (formData.password !== formData.confirmPassword) {
+      // REMPLACER ALERT PAR TOAST
+      toast.error("Les mots de passe ne correspondent pas");
       return setError("Les mots de passe ne correspondent pas");
     }
     if (!formData.acceptTerms) {
+      // REMPLACER ALERT PAR TOAST
+      toast.error("Vous devez accepter les conditions d'utilisation");
       return setError("Vous devez accepter les conditions d'utilisation");
     }
 
@@ -50,6 +56,9 @@ function Register() {
         localStorage.setItem("token", "fake-jwt-token");
         localStorage.setItem("user", JSON.stringify(user));
 
+        // REMPLACER ALERT PAR TOAST
+        toast.success("Inscription réussie !");
+
         switch(formData.role) {
           case "administrateur":
             navigate("/admin");
@@ -63,6 +72,8 @@ function Register() {
         setLoading(false);
       }, 1000);
     } catch (error) {
+      // REMPLACER ALERT PAR TOAST
+      toast.error("Erreur lors de l'inscription");
       setError("Erreur lors de l'inscription");
       setLoading(false);
     }
@@ -70,6 +81,20 @@ function Register() {
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
+      {/* AJOUT DU TOAST CONTAINER */}
+      <ToastContainer 
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+
       <div className="max-w-5xl w-full rounded-3xl overflow-hidden shadow-2xl border border-gray-100 bg-white grid md:grid-cols-2">
 
         {/* LEFT SIDE */}
@@ -114,7 +139,7 @@ function Register() {
                     name="nom"
                     value={formData.nom}
                     onChange={handleChange}
-                    placeholder="Dupont"
+                    placeholder="Taper votre nom"
                     required
                     className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500"
                   />
@@ -129,7 +154,7 @@ function Register() {
                     name="prenom"
                     value={formData.prenom}
                     onChange={handleChange}
-                    placeholder="Jean"
+                    placeholder="Taper votre prenom"
                     required
                     className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500"
                   />
@@ -146,7 +171,7 @@ function Register() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="jean@academy.com"
+                  placeholder="votrenom@academy.com"
                   required
                   className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500"
                 />

@@ -1,22 +1,38 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import axios from "axios";
 
 function CertificatesPage() {
   const navigate = useNavigate();
   const [certificates, setCertificates] = useState([]);
   const [inProgressCourses, setInProgressCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [shareModal, setShareModal] = useState(null);
 
-  // Charger les données
+  const API_BASE = "http://localhost:5000/api";
+
   useEffect(() => {
     loadCertificates();
+    loadInProgressCourses();
   }, []);
 
   const loadCertificates = async () => {
     try {
-      // Simuler un appel API
-      setTimeout(() => {
-        setCertificates([
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      try {
+        const response = await axios.get(`${API_BASE}/certificats/mes-certificats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setCertificates(response.data);
+        toast.success(`📜 ${response.data.length} certificats chargés`);
+      } catch (apiError) {
+        console.log("API non disponible, chargement des données locales");
+        // Données simulées
+        const mockCertificates = [
           {
             id: "SAF-2024-001",
             course: "Tajwid Avancé",
@@ -25,10 +41,42 @@ function CertificatesPage() {
             instructor: "Cheikh Ahmed Al-Mansouri",
             score: 94,
             hours: 42,
-            image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop"
+            image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop",
+            pdf: "/certificats/saf-2024-001.pdf"
+          },
+          {
+            id: "SAF-2024-002",
+            course: "Arabe Classique - Niveau 1",
+            level: "Débutant",
+            date: "10 jan 2024",
+            instructor: "Dr. Fatima Zahra",
+            score: 88,
+            hours: 36,
+            image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&h=400&fit=crop",
+            pdf: "/certificats/saf-2024-002.pdf"
           }
-        ]);
+        ];
+        setCertificates(mockCertificates);
+      }
+    } catch (error) {
+      console.error("Erreur chargement certificats:", error);
+      toast.error("❌ Erreur lors du chargement des certificats");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const loadInProgressCourses = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      try {
+        const response = await axios.get(`${API_BASE}/cours/en-cours`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setInProgressCourses(response.data);
+      } catch (apiError) {
+        // Données simulées
         setInProgressCourses([
           {
             id: 2,
@@ -52,25 +100,69 @@ function CertificatesPage() {
             estimatedCompletion: "août 2026"
           }
         ]);
-        setLoading(false);
-      }, 500);
+      }
     } catch (error) {
-      console.error("Erreur chargement certificats:", error);
-      setLoading(false);
+      console.error("Erreur chargement cours en cours:", error);
     }
   };
 
-  const handleDownloadCertificate = (certificateId) => {
-    console.log("Téléchargement du certificat", certificateId);
-    // Générer un PDF
-    window.open(`/api/certificats/${certificateId}/pdf`, '_blank');
+  const handleDownloadCertificate = async (certificateId) => {
+    try {
+      toast.info("📥 Préparation du téléchargement...");
+      
+      const token = localStorage.getItem('token');
+      
+      try {
+        const response = await axios.get(`${API_BASE}/certificats/${certificateId}/pdf`, {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob'
+        });
+        
+        // Créer un lien de téléchargement
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `certificat-${certificateId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        toast.success("✅ Certificat téléchargé !");
+      } catch (apiError) {
+        // Simulation de téléchargement
+        setTimeout(() => {
+          toast.success("✅ Certificat téléchargé (mode développement)");
+          window.open(`/certificats/${certificateId}/pdf`, '_blank');
+        }, 1000);
+      }
+    } catch (error) {
+      toast.error("❌ Erreur lors du téléchargement");
+    }
   };
 
-  const handleShareCertificate = (certificateId) => {
-    console.log("Partage du certificat", certificateId);
-    // Copier le lien
-    navigator.clipboard.writeText(`https://safouaacademy.com/certificats/${certificateId}`);
-    alert("Lien copié dans le presse-papiers !");
+  const handleShareCertificate = (certificate) => {
+    setShareModal(certificate);
+  };
+
+  const handleShareConfirm = async (method, certificateId) => {
+    const shareUrl = `https://safouaacademy.com/certificats/${certificateId}`;
+    
+    try {
+      if (method === 'copy') {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("📋 Lien copié dans le presse-papiers !");
+      } else if (method === 'email') {
+        window.location.href = `mailto:?subject=Mon certificat Safoua Academy&body=J'ai obtenu mon certificat ! Consultez-le ici : ${shareUrl}`;
+        toast.success("📧 Client email ouvert");
+      } else if (method === 'linkedin') {
+        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank');
+        toast.success("🔗 Partage LinkedIn ouvert");
+      }
+      
+      setShareModal(null);
+    } catch (error) {
+      toast.error("❌ Erreur lors du partage");
+    }
   };
 
   const handleViewCertificate = (certificateId) => {
@@ -81,8 +173,30 @@ function CertificatesPage() {
     navigate(`/cours/${courseId}`);
   };
 
+  const handleGenerateCertificate = (courseId) => {
+    // Générer un nouveau certificat (après completion du cours)
+    toast.success("🎉 Félicitations ! Votre certificat est en cours de génération...");
+    setTimeout(() => {
+      loadCertificates();
+      toast.success("📜 Nouveau certificat disponible !");
+    }, 2000);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+
       {/* Header */}
       <header className="bg-white shadow-md border-t-4 border-emerald-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -110,6 +224,51 @@ function CertificatesPage() {
           </button>
         </div>
       </header>
+
+      {/* Modal de partage */}
+      {shareModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Partager le certificat</h3>
+            <p className="text-sm text-gray-600 mb-4">{shareModal.course}</p>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => handleShareConfirm('copy', shareModal.id)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition border border-gray-200"
+              >
+                <span className="text-2xl">📋</span>
+                <span className="flex-1 text-left">Copier le lien</span>
+              </button>
+              
+              <button
+                onClick={() => handleShareConfirm('email', shareModal.id)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition border border-gray-200"
+              >
+                <span className="text-2xl">📧</span>
+                <span className="flex-1 text-left">Partager par email</span>
+              </button>
+              
+              <button
+                onClick={() => handleShareConfirm('linkedin', shareModal.id)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition border border-gray-200"
+              >
+                <span className="text-2xl">💼</span>
+                <span className="flex-1 text-left">Partager sur LinkedIn</span>
+              </button>
+            </div>
+            
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setShareModal(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contenu principal */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -145,7 +304,7 @@ function CertificatesPage() {
                 </h2>
                 
                 {certificates.map((cert) => (
-                  <div key={cert.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div key={cert.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition">
                     {/* En-tête du certificat */}
                     <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-8 border-b-4 border-emerald-600">
                       <div className="text-center">
@@ -179,21 +338,21 @@ function CertificatesPage() {
                       
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={() => handleShareCertificate(cert.id)}
-                          className="px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                          onClick={() => handleShareCertificate(cert)}
+                          className="px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
                           title="Partager"
                         >
                           <span>📤</span>
-                          <span className="hidden sm:inline ml-2">Partager</span>
+                          <span className="hidden sm:inline">Partager</span>
                         </button>
                         
                         <button 
                           onClick={() => handleViewCertificate(cert.id)}
-                          className="px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                          className="px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
                           title="Voir"
                         >
                           <span>👁️</span>
-                          <span className="hidden sm:inline ml-2">Voir</span>
+                          <span className="hidden sm:inline">Voir</span>
                         </button>
                         
                         <button 

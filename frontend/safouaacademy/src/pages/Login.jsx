@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function Login() {
   const [formData, setFormData] = useState({
@@ -38,6 +40,9 @@ function Login() {
           localStorage.setItem("token", "fake-jwt-token");
           localStorage.setItem("user", JSON.stringify(user));
 
+          // REMPLACER ALERT PAR TOAST
+          toast.success("Connexion réussie !");
+
           // Redirection selon le rôle
           switch(formData.role) {
             case "administrateur":
@@ -50,11 +55,15 @@ function Login() {
               navigate("/etudiant");
           }
         } else {
+          // REMPLACER ALERT PAR TOAST
+          toast.error("Email ou mot de passe incorrect");
           setError("Email ou mot de passe incorrect");
         }
         setLoading(false);
       }, 1000);
     } catch (error) {
+      // REMPLACER ALERT PAR TOAST
+      toast.error("Erreur de connexion");
       setError("Erreur de connexion");
       setLoading(false);
     }
@@ -62,6 +71,20 @@ function Login() {
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
+      {/* AJOUT DU TOAST CONTAINER */}
+      <ToastContainer 
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+
       <div className="max-w-5xl w-full rounded-3xl overflow-hidden shadow-2xl border border-gray-100 bg-white grid md:grid-cols-2">
 
         {/* LEFT SIDE */}
