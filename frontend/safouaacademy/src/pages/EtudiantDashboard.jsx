@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import axios from "axios";
+import api from "../services/api";
+import coursService from "../services/coursService";
 
 function EtudiantDashboard() {
   const navigate = useNavigate();
@@ -30,87 +31,78 @@ function EtudiantDashboard() {
   const [categories, setCategories] = useState([]);
   const [levels, setLevels] = useState([]);
   const [wishlist, setWishlist] = useState([]);
+  const [user, setUser] = useState(null);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
 
-  const API_BASE = "http://localhost:5000/api";
+  // Charger l'utilisateur au démarrage
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        setUser(JSON.parse(userData));
+      } else {
+        toast.warning("🔐 Veuillez vous connecter");
+        navigate('/login');
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement de l'utilisateur:", error);
+    }
+  }, [navigate]);
 
   // Fonction de déconnexion
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('role');
+    localStorage.removeItem('enrolledCourses');
+    localStorage.removeItem('wishlist');
     toast.success("👋 Déconnexion réussie");
-    navigate('/', { replace: true });
+    setTimeout(() => {
+      navigate('/', { replace: true });
+    }, 1000);
   };
 
   useEffect(() => {
-    loadStudentData();
-    loadRecommendedCourses();
-    loadStats();
-    loadWishlist();
-  }, []);
+    if (user) {
+      loadStudentData();
+      loadRecommendedCourses();
+      loadStats();
+      loadWishlist();
+      loadRecentActivities();
+      loadUpcomingDeadlines();
+    }
+  }, [user]);
 
   const loadStudentData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user'));
       
-      try {
-        const response = await axios.get(`${API_BASE}/etudiant/mes-cours`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setMyCourses(response.data);
-        toast.success(`📚 ${response.data.length} cours chargés`);
-      } catch (apiError) {
-        console.log("API non disponible, chargement des données locales");
+      const result = await coursService.getStudentCourses();
+      
+      if (result.success) {
+        setMyCourses(result.data);
         
-        // Récupérer les inscriptions depuis localStorage
-        const enrolledIds = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-        const allCourses = JSON.parse(localStorage.getItem('courses') || '[]');
-        
-        const enrolledCourses = allCourses.filter(c => enrolledIds.includes(c.id));
-        
-        if (enrolledCourses.length > 0) {
-          setMyCourses(enrolledCourses);
-        } else {
-          // Données simulées
-          const mockCourses = [
-            {
-              id: 1,
-              titre: "Tajwid Avancé",
-              instructor: "Cheikh Ahmed Al-Mansouri",
-              niveau: "Expert",
-              progress: 64,
-              remainingLessons: 8,
-              nextLesson: { id: "l3", title: "Les règles de prolongation" },
-              image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=250&fit=crop",
-              lastAccessed: "2026-03-15",
-              certificate: true
-            },
-            {
-              id: 2,
-              titre: "Arabe Classique",
-              instructor: "Dr. Fatima Zahra",
-              niveau: "Débutant",
-              progress: 32,
-              remainingLessons: 24,
-              nextLesson: { id: "l2", title: "Les verbes" },
-              image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&h=250&fit=crop",
-              lastAccessed: "2026-03-14",
-              certificate: true
-            }
-          ];
-          setMyCourses(mockCourses);
-        }
-
         // Extraire les catégories et niveaux
-        const uniqueCategories = [...new Set(allCourses.map(c => c.category))];
-        const uniqueLevels = [...new Set(allCourses.map(c => c.niveau))];
+        const uniqueCategories = [...new Set(result.data.map(c => c.category))];
+        const uniqueLevels = [...new Set(result.data.map(c => c.niveau))];
         setCategories(uniqueCategories);
         setLevels(uniqueLevels);
+        
+        // Sauvegarder en cache
+        localStorage.setItem('myCourses', JSON.stringify(result.data));
       }
+      
     } catch (error) {
       console.error("Erreur chargement cours:", error);
+      
+      // Utiliser le cache si disponible
+      const cached = JSON.parse(localStorage.getItem('myCourses') || '[]');
+      if (cached.length > 0) {
+        setMyCourses(cached);
+        toast.info("📚 Cours chargés depuis le cache");
+      }
+      
       toast.error("❌ Erreur lors du chargement de vos cours");
     } finally {
       setLoading(false);
@@ -119,82 +111,77 @@ function EtudiantDashboard() {
 
   const loadRecommendedCourses = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      try {
-        const response = await axios.get(`${API_BASE}/cours/recommandes`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setRecommendedCourses(response.data);
-      } catch (apiError) {
-        // Données simulées
-        const mockRecommended = [
-          {
-            id: 3,
-            titre: "Fiqh et Usul",
-            instructor: "Cheikh Mohammed Al-Hassan",
-            niveau: "Intermédiaire",
-            category: "Jurisprudence",
-            rating: 4.7,
-            students: 189,
-            price: 79,
-            image: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=250&fit=crop",
-            reason: "Basé sur vos cours précédents"
-          },
-          {
-            id: 4,
-            titre: "Tafsir du Coran",
-            instructor: "Dr. Amina Al-Maghribi",
-            niveau: "Intermédiaire",
-            category: "Coran",
-            rating: 4.9,
-            students: 312,
-            price: 99,
-            image: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&h=250&fit=crop",
-            reason: "Populaire parmi les étudiants"
-          }
-        ];
-        setRecommendedCourses(mockRecommended);
-      }
+      const response = await api.get('/cours/recommandes');
+      setRecommendedCourses(response.data.data || response.data);
     } catch (error) {
       console.error("Erreur chargement recommandations:", error);
+      
+      // Recommandations basées sur les cours de l'utilisateur
+      if (myCourses.length > 0) {
+        const categories = myCourses.map(c => c.category);
+        const allCourses = JSON.parse(localStorage.getItem('courses') || '[]');
+        const recommended = allCourses
+          .filter(c => !myCourses.some(mc => mc.id === c.id) && categories.includes(c.category))
+          .slice(0, 3);
+        
+        setRecommendedCourses(recommended);
+      }
     }
   };
 
   const loadStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      try {
-        const response = await axios.get(`${API_BASE}/etudiant/statistiques`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setStats(response.data);
-      } catch (apiError) {
-        // Calculer les stats depuis localStorage
-        const enrolledIds = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-        const completedLessons = JSON.parse(localStorage.getItem('lesson-progress') || '{}');
-        const quizResults = JSON.parse(localStorage.getItem('quizResults') || '[]');
-        
-        setStats({
-          enrolledCourses: enrolledIds.length,
-          completedCourses: Math.floor(enrolledIds.length * 0.3), // Simulation
-          totalHours: 42,
-          certificates: 1,
-          averageScore: quizResults.length > 0 
-            ? Math.round(quizResults.reduce((acc, q) => acc + q.score, 0) / quizResults.length)
-            : 0,
-          nextLesson: myCourses[0]?.nextLesson || null
-        });
-      }
+      const response = await api.get('/etudiant/statistiques');
+      setStats(response.data.data || response.data);
     } catch (error) {
       console.error("Erreur chargement stats:", error);
+      
+      // Calculer les stats basées sur les cours
+      const totalProgress = myCourses.reduce((acc, course) => acc + (course.progress || 0), 0);
+      const avgProgress = myCourses.length > 0 ? Math.round(totalProgress / myCourses.length) : 0;
+      const completed = myCourses.filter(c => c.progress === 100).length;
+      
+      setStats({
+        enrolledCourses: myCourses.length,
+        completedCourses: completed,
+        totalHours: myCourses.reduce((acc, c) => acc + (c.duration || 0), 0),
+        certificates: completed,
+        averageScore: avgProgress,
+        nextLesson: myCourses[0]?.nextLesson || null
+      });
     }
   };
 
   const loadWishlist = () => {
     const saved = JSON.parse(localStorage.getItem('wishlist') || '[]');
     setWishlist(saved);
+  };
+
+  const loadRecentActivities = async () => {
+    try {
+      const response = await api.get('/etudiant/activites');
+      setRecentActivities(response.data.data || response.data);
+    } catch (error) {
+      // Activités simulées
+      setRecentActivities([
+        { id: 1, type: 'course', message: 'Vous avez commencé "Tajwid Avancé"', time: 'il y a 2h' },
+        { id: 2, type: 'quiz', message: 'Quiz "Introduction" réussi avec 90%', time: 'hier' },
+        { id: 3, type: 'certificate', message: 'Certificat "Arabe Classique" obtenu', time: 'il y a 3 jours' }
+      ]);
+    }
+  };
+
+  const loadUpcomingDeadlines = async () => {
+    try {
+      const response = await api.get('/etudiant/echeances');
+      setUpcomingDeadlines(response.data.data || response.data);
+    } catch (error) {
+      // Échéances simulées
+      setUpcomingDeadlines([
+        { id: 1, course: "Tajwid Avancé", task: "Quiz final", dueDate: "2026-03-20" },
+        { id: 2, course: "Arabe Classique", task: "Devoir maison", dueDate: "2026-03-22" }
+      ]);
+    }
   };
 
   const handleContinueCourse = (courseId) => {
@@ -209,28 +196,18 @@ function EtudiantDashboard() {
     e.stopPropagation();
     
     try {
-      toast.info("📝 Inscription en cours...");
+      const result = await coursService.enrollToCours(courseId);
       
-      const token = localStorage.getItem('token');
-      const enrolled = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-      
-      if (!enrolled.includes(courseId)) {
-        enrolled.push(courseId);
-        localStorage.setItem('enrolledCourses', JSON.stringify(enrolled));
+      if (result.success) {
+        toast.success(result.message);
         
-        try {
-          await axios.post(`${API_BASE}/cours/${courseId}/inscrire`, {}, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        } catch (apiError) {
-          // Mode hors-ligne
-        }
-        
-        toast.success("✅ Inscription réussie !");
-        loadStudentData(); // Recharger les données
-      } else {
-        toast.info("📚 Vous êtes déjà inscrit à ce cours");
+        // Recharger les données après l'inscription
+        setTimeout(() => {
+          loadStudentData();
+          loadRecommendedCourses();
+        }, 1000);
       }
+      
     } catch (error) {
       toast.error("❌ Erreur lors de l'inscription");
     }
@@ -272,21 +249,22 @@ function EtudiantDashboard() {
   };
 
   const handleTakeQuiz = (courseId) => {
-    navigate(`/quiz/cours/${courseId}`);
+    navigate(`/quiz/${courseId}`);
   };
 
   const handleViewCertificate = (courseId) => {
     navigate(`/certificats/${courseId}`);
   };
 
+  // Filtrer les cours recommandés
   const filteredCourses = recommendedCourses.filter(course => {
     const matchCategory = !filters.category || course.category === filters.category;
     const matchLevel = !filters.level || course.niveau === filters.level;
     const matchSearch = !filters.search || 
-      course.titre.toLowerCase().includes(filters.search.toLowerCase()) ||
-      course.instructor.toLowerCase().includes(filters.search.toLowerCase());
-    const matchPrice = (!filters.priceMin || course.price >= parseInt(filters.priceMin)) &&
-                      (!filters.priceMax || course.price <= parseInt(filters.priceMax));
+      course.titre?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      course.instructor?.toLowerCase().includes(filters.search.toLowerCase());
+    const matchPrice = (!filters.priceMin || course.prix >= parseInt(filters.priceMin)) &&
+                      (!filters.priceMax || course.prix <= parseInt(filters.priceMax));
     
     return matchCategory && matchLevel && matchSearch && matchPrice;
   });
@@ -297,32 +275,36 @@ function EtudiantDashboard() {
         position="top-right"
         autoClose={4000}
         hideProgressBar={false}
-        newestOnTop
-        closeOnClick
+        newestOnTop={true}
+        closeOnClick={true}
         rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
+        pauseOnFocusLoss={true}
+        draggable={true}
+        pauseOnHover={true}
         theme="colored"
       />
 
-      <header className="bg-white shadow-md border-t-4 border-emerald-600">
+      {/* HEADER */}
+      <header className="bg-white shadow-md border-t-4 border-emerald-600 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
             Safoua Academy
           </Link>
           
           <nav className="hidden md:flex space-x-8 items-center">
-            <Link to="/catalogue" className="text-gray-600 hover:text-emerald-600">
+            <Link to="/catalogue" className="text-gray-600 hover:text-emerald-600 transition">
               Catalogue
             </Link>
-            <Link to="/etudiant" className="text-emerald-600 font-semibold">
+            <button 
+              onClick={() => setActiveTab("mes-cours")}
+              className={`${activeTab === "mes-cours" ? 'text-emerald-600 font-semibold' : 'text-gray-600 hover:text-emerald-600'}`}
+            >
               Mes cours
-            </Link>
-            <Link to="/progression" className="text-gray-600 hover:text-emerald-600">
+            </button>
+            <Link to="/progression" className="text-gray-600 hover:text-emerald-600 transition">
               Progression
             </Link>
-            <Link to="/certificats" className="text-gray-600 hover:text-emerald-600">
+            <Link to="/certificats" className="text-gray-600 hover:text-emerald-600 transition">
               Certificats
             </Link>
             <button 
@@ -334,6 +316,12 @@ function EtudiantDashboard() {
           </nav>
           
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-emerald-50 px-3 py-2 rounded-lg">
+              <span className="text-emerald-600">👤</span>
+              <span className="text-sm font-semibold text-gray-700">
+                {user?.prenom || user?.name || 'Étudiant'}
+              </span>
+            </div>
             <button 
               onClick={() => navigate('/compte')}
               className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
@@ -351,41 +339,65 @@ function EtudiantDashboard() {
         </div>
       </header>
 
+      {/* MAIN CONTENT */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* En-tête avec bienvenue */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">
-            Bonjour, {JSON.parse(localStorage.getItem('user'))?.name || 'Étudiant'} 👋
+            Bonjour, {user?.prenom || user?.name || 'Étudiant'} 👋
           </h1>
           <p className="text-gray-600 mt-1">
-            Continuez votre apprentissage et suivez votre progression
+            {new Date().toLocaleDateString('fr-FR', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
           </p>
         </div>
 
         {/* Statistiques rapides */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition">
             <p className="text-sm text-gray-500">Cours inscrits</p>
             <p className="text-2xl font-bold text-emerald-600">{stats.enrolledCourses}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition">
             <p className="text-sm text-gray-500">Complétés</p>
             <p className="text-2xl font-bold text-emerald-600">{stats.completedCourses}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition">
             <p className="text-sm text-gray-500">Heures apprises</p>
             <p className="text-2xl font-bold text-emerald-600">{stats.totalHours}h</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition">
             <p className="text-sm text-gray-500">Certificats</p>
             <p className="text-2xl font-bold text-emerald-600">{stats.certificates}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <p className="text-sm text-gray-500">Score moyen</p>
+          <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition">
+            <p className="text-sm text-gray-500">Progression</p>
             <p className="text-2xl font-bold text-emerald-600">{stats.averageScore}%</p>
           </div>
         </div>
+
+        {/* Échéances à venir */}
+        {upcomingDeadlines.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-amber-600">⏰</span>
+              <h3 className="font-semibold text-amber-800">Échéances à venir</h3>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              {upcomingDeadlines.map((deadline) => (
+                <div key={deadline.id} className="bg-white rounded-lg px-4 py-2 shadow-sm">
+                  <p className="text-sm font-medium text-gray-900">{deadline.course}</p>
+                  <p className="text-xs text-gray-600">{deadline.task} - {new Date(deadline.dueDate).toLocaleDateString('fr-FR')}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center gap-4 mb-6 border-b border-gray-200">
@@ -397,7 +409,7 @@ function EtudiantDashboard() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            Mes cours
+            Mes cours ({myCourses.length})
           </button>
           <button 
             onClick={() => setActiveTab("recommandations")}
@@ -407,7 +419,7 @@ function EtudiantDashboard() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            Recommandés
+            Recommandés ({recommendedCourses.length})
           </button>
           <button 
             onClick={() => setActiveTab("wishlist")}
@@ -424,276 +436,366 @@ function EtudiantDashboard() {
               </span>
             )}
           </button>
+          <button 
+            onClick={() => setActiveTab("activites")}
+            className={`px-6 py-3 font-semibold transition ${
+              activeTab === "activites" 
+                ? "text-emerald-600 border-b-2 border-emerald-600" 
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Activités
+          </button>
         </div>
 
-        {activeTab === "mes-cours" && (
-          <div className="space-y-4">
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600"></div>
-              </div>
-            ) : myCourses.length > 0 ? (
-              myCourses.map((course) => (
-                <div key={course.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition">
-                  <div className="flex flex-col md:flex-row">
-                    <div className="md:w-48 h-32 md:h-auto">
-                      <img 
-                        src={course.image} 
-                        alt={course.titre}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 p-6">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900">{course.titre}</h3>
-                          <p className="text-sm text-gray-600">{course.instructor}</p>
-                        </div>
-                        <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
-                          {course.niveau}
-                        </span>
-                      </div>
-
-                      <div className="mb-4">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600">Progression</span>
-                          <span className="font-semibold text-emerald-600">{course.progress}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-emerald-600 transition-all" 
-                            style={{ width: `${course.progress}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-gray-500">
-                          <span className="mr-4">📚 {course.remainingLessons} leçons restantes</span>
-                          <span>📅 Dernier accès: {course.lastAccessed}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleContinueCourse(course.id)}
-                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
-                          >
-                            Continuer
-                          </button>
-                          <button
-                            onClick={() => handleTakeQuiz(course.id)}
-                            className="border border-emerald-600 text-emerald-600 px-4 py-2 rounded-lg hover:bg-emerald-50 transition font-semibold text-sm"
-                          >
-                            Quiz
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                <span className="text-6xl mb-4 block">📚</span>
-                <h3 className="text-xl font-bold text-gray-700 mb-2">Aucun cours pour le moment</h3>
-                <p className="text-gray-500 mb-4">Explorez notre catalogue et commencez votre apprentissage</p>
-                <Link 
-                  to="/cours" 
-                  className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold"
-                >
-                  <span>🔍</span>
-                  Explorer les cours
-                </Link>
-              </div>
-            )}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600"></div>
           </div>
-        )}
+        ) : (
+          <>
+            {/* TAB MES COURS */}
+            {activeTab === "mes-cours" && (
+              <div className="space-y-4">
+                {myCourses.length > 0 ? (
+                  myCourses.map((course) => (
+                    <div 
+                      key={course.id} 
+                      className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition cursor-pointer"
+                      onClick={() => handleContinueCourse(course.id)}
+                    >
+                      <div className="flex flex-col md:flex-row">
+                        <div className="md:w-48 h-32 md:h-auto relative">
+                          <img 
+                            src={course.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=250&fit=crop"} 
+                            alt={course.titre}
+                            className="w-full h-full object-cover"
+                          />
+                          {course.progress === 100 && (
+                            <span className="absolute top-2 right-2 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full">
+                              ✅ Complété
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 p-6">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">{course.titre}</h3>
+                              <p className="text-sm text-gray-600">{course.instructor}</p>
+                            </div>
+                            <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
+                              {course.niveau}
+                            </span>
+                          </div>
 
-        {activeTab === "recommandations" && (
-          <div className="space-y-6">
-            {/* Filtres */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-gray-900">Filtres</h2>
-                {(filters.category || filters.level || filters.search || filters.priceMin || filters.priceMax) && (
-                  <button
-                    onClick={resetFilters}
-                    className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
-                  >
-                    Réinitialiser
-                  </button>
+                          <div className="mb-4">
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-gray-600">Progression</span>
+                              <span className="font-semibold text-emerald-600">{course.progress || 0}%</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-emerald-600 transition-all" 
+                                style={{ width: `${course.progress || 0}%` }}
+                              ></div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-500">
+                              <span className="mr-4">📚 {course.remainingLessons || 0} leçons restantes</span>
+                              <span>📅 Dernier accès: {course.lastAccessed || new Date().toLocaleDateString('fr-FR')}</span>
+                            </div>
+                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => handleContinueCourse(course.id)}
+                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
+                              >
+                                {course.progress === 0 ? 'Commencer' : 'Continuer'}
+                              </button>
+                              <button
+                                onClick={() => handleTakeQuiz(course.id)}
+                                className="border border-emerald-600 text-emerald-600 px-4 py-2 rounded-lg hover:bg-emerald-50 transition font-semibold text-sm"
+                              >
+                                Quiz
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                    <span className="text-6xl mb-4 block">📚</span>
+                    <h3 className="text-xl font-bold text-gray-700 mb-2">Aucun cours pour le moment</h3>
+                    <p className="text-gray-500 mb-4">Explorez notre catalogue et commencez votre apprentissage</p>
+                    <button 
+                      onClick={() => setActiveTab("recommandations")}
+                      className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold"
+                    >
+                      <span>🔍</span>
+                      Explorer les cours
+                    </button>
+                  </div>
                 )}
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <input
-                  type="text"
-                  name="search"
-                  placeholder="Rechercher..."
-                  value={filters.search}
-                  onChange={handleFilterChange}
-                  className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <select
-                  name="category"
-                  value={filters.category}
-                  onChange={handleFilterChange}
-                  className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">Toutes catégories</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                <select
-                  name="level"
-                  value={filters.level}
-                  onChange={handleFilterChange}
-                  className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">Tous niveaux</option>
-                  {levels.map(level => (
-                    <option key={level} value={level}>{level}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  name="priceMin"
-                  placeholder="Prix min"
-                  value={filters.priceMin}
-                  onChange={handleFilterChange}
-                  className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <input
-                  type="number"
-                  name="priceMax"
-                  placeholder="Prix max"
-                  value={filters.priceMax}
-                  onChange={handleFilterChange}
-                  className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            </div>
-
-            {/* Liste des recommandations */}
-            {filteredCourses.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredCourses.map((course) => (
-                  <div key={course.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition cursor-pointer"
-                       onClick={() => handleViewCourse(course.id)}>
-                    <div className="h-40 overflow-hidden">
-                      <img 
-                        src={course.image} 
-                        alt={course.titre}
-                        className="w-full h-full object-cover hover:scale-105 transition duration-300"
-                      />
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-bold text-gray-900">{course.titre}</h3>
-                        <div className="flex items-center gap-1">
-                          <span className="text-yellow-400">★</span>
-                          <span className="text-sm font-semibold">{course.rating}</span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">{course.instructor}</p>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="bg-gray-100 px-2 py-1 rounded-full text-xs">
-                          {course.category}
-                        </span>
-                        <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs">
-                          {course.niveau}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mb-2">{course.reason}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <span>👥 {course.students}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => handleToggleWishlist(course, e)}
-                            className={`p-2 rounded-lg transition ${
-                              wishlist.some(c => c.id === course.id)
-                                ? 'text-red-500 hover:bg-red-50'
-                                : 'text-gray-400 hover:bg-gray-100'
-                            }`}
-                          >
-                            ❤️
-                          </button>
-                          <button
-                            onClick={(e) => handleEnrollCourse(course.id, e)}
-                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
-                          >
-                            {course.price === 0 ? 'Gratuit' : `${course.price} DT`}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                <p className="text-gray-500">Aucun cours trouvé</p>
-              </div>
             )}
-          </div>
-        )}
 
-        {activeTab === "wishlist" && (
-          <div className="space-y-4">
-            {wishlist.length > 0 ? (
-              wishlist.map((course) => (
-                <div key={course.id} className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <img 
-                      src={course.image} 
-                      alt={course.titre}
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{course.titre}</h3>
-                      <p className="text-sm text-gray-600">{course.instructor}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
-                          {course.category}
-                        </span>
-                        <span className="text-xs text-emerald-600 font-semibold">
-                          {course.price} DT
-                        </span>
-                      </div>
-                    </div>
+            {/* TAB RECOMMANDATIONS */}
+            {activeTab === "recommandations" && (
+              <div className="space-y-6">
+                {/* Filtres */}
+                <div className="bg-white rounded-xl shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold text-gray-900">Filtres</h2>
+                    {(filters.category || filters.level || filters.search || filters.priceMin || filters.priceMax) && (
+                      <button
+                        onClick={resetFilters}
+                        className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
+                      >
+                        Réinitialiser
+                      </button>
+                    )}
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleViewCourse(course.id)}
-                      className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm"
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <input
+                      type="text"
+                      name="search"
+                      placeholder="Rechercher..."
+                      value={filters.search}
+                      onChange={handleFilterChange}
+                      className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <select
+                      name="category"
+                      value={filters.category}
+                      onChange={handleFilterChange}
+                      className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
-                      Voir
-                    </button>
-                    <button
-                      onClick={(e) => handleToggleWishlist(course, e)}
-                      className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm"
+                      <option value="">Toutes catégories</option>
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <select
+                      name="level"
+                      value={filters.level}
+                      onChange={handleFilterChange}
+                      className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
-                      Retirer
-                    </button>
+                      <option value="">Tous niveaux</option>
+                      {levels.map(level => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      name="priceMin"
+                      placeholder="Prix min"
+                      value={filters.priceMin}
+                      onChange={handleFilterChange}
+                      min="0"
+                      className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <input
+                      type="number"
+                      name="priceMax"
+                      placeholder="Prix max"
+                      value={filters.priceMax}
+                      onChange={handleFilterChange}
+                      min="0"
+                      className="rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                <span className="text-6xl mb-4 block">❤️</span>
-                <h3 className="text-xl font-bold text-gray-700 mb-2">Wishlist vide</h3>
-                <p className="text-gray-500 mb-4">Ajoutez des cours à votre wishlist pour les retrouver plus tard</p>
-                <Link 
-                  to="/cours" 
-                  className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold"
-                >
-                  Découvrir des cours
-                </Link>
+
+                {/* Liste des recommandations */}
+                {filteredCourses.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredCourses.map((course) => (
+                      <div 
+                        key={course.id} 
+                        className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition cursor-pointer"
+                        onClick={() => handleViewCourse(course.id)}
+                      >
+                        <div className="h-40 overflow-hidden relative">
+                          <img 
+                            src={course.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=250&fit=crop"} 
+                            alt={course.titre}
+                            className="w-full h-full object-cover hover:scale-105 transition duration-300"
+                          />
+                          {course.prix === 0 && (
+                            <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                              Gratuit
+                            </span>
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="font-bold text-gray-900 line-clamp-1">{course.titre}</h3>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <span className="text-yellow-400">★</span>
+                              <span className="text-sm font-semibold">{course.rating || 4.5}</span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-2 line-clamp-1">{course.instructor}</p>
+                          <div className="flex items-center gap-2 mb-3 flex-wrap">
+                            <span className="bg-gray-100 px-2 py-1 rounded-full text-xs">
+                              {course.category}
+                            </span>
+                            <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs">
+                              {course.niveau}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mb-2 italic">{course.reason || "Basé sur vos intérêts"}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <span>👥 {course.students || Math.floor(Math.random() * 200) + 50}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => handleToggleWishlist(course, e)}
+                                className={`p-2 rounded-lg transition ${
+                                  wishlist.some(c => c.id === course.id)
+                                    ? 'text-red-500 hover:bg-red-50'
+                                    : 'text-gray-400 hover:bg-gray-100'
+                                }`}
+                                title={wishlist.some(c => c.id === course.id) ? "Retirer de la wishlist" : "Ajouter à la wishlist"}
+                              >
+                                {wishlist.some(c => c.id === course.id) ? '❤️' : '🤍'}
+                              </button>
+                              <button
+                                onClick={(e) => handleEnrollCourse(course.id, e)}
+                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
+                              >
+                                {course.prix === 0 ? 'Gratuit' : `${course.prix} DT`}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                    <span className="text-6xl mb-4 block">🔍</span>
+                    <p className="text-gray-500">Aucun cours trouvé avec ces filtres</p>
+                  </div>
+                )}
               </div>
             )}
-          </div>
+
+            {/* TAB WISHLIST */}
+            {activeTab === "wishlist" && (
+              <div className="space-y-4">
+                {wishlist.length > 0 ? (
+                  wishlist.map((course) => (
+                    <div 
+                      key={course.id} 
+                      className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between hover:shadow-md transition"
+                    >
+                      <div className="flex items-center gap-4">
+                        <img 
+                          src={course.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=250&fit=crop"} 
+                          alt={course.titre}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{course.titre}</h3>
+                          <p className="text-sm text-gray-600">{course.instructor}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+                              {course.category}
+                            </span>
+                            <span className="text-xs text-emerald-600 font-semibold">
+                              {course.prix === 0 ? 'Gratuit' : `${course.prix} DT`}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ★ {course.rating || 4.5}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleViewCourse(course.id)}
+                          className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm"
+                        >
+                          Voir
+                        </button>
+                        <button
+                          onClick={(e) => handleEnrollCourse(course.id, e)}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm"
+                        >
+                          S'inscrire
+                        </button>
+                        <button
+                          onClick={(e) => handleToggleWishlist(course, e)}
+                          className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm"
+                        >
+                          Retirer
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                    <span className="text-6xl mb-4 block">❤️</span>
+                    <h3 className="text-xl font-bold text-gray-700 mb-2">Wishlist vide</h3>
+                    <p className="text-gray-500 mb-4">Ajoutez des cours à votre wishlist pour les retrouver plus tard</p>
+                    <button 
+                      onClick={() => setActiveTab("recommandations")}
+                      className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold"
+                    >
+                      Découvrir des cours
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB ACTIVITÉS */}
+            {activeTab === "activites" && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Activités récentes</h2>
+                
+                <div className="space-y-4">
+                  {recentActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        activity.type === 'course' ? 'bg-blue-100' :
+                        activity.type === 'quiz' ? 'bg-green-100' : 'bg-yellow-100'
+                      }`}>
+                        <span className="text-lg">
+                          {activity.type === 'course' ? '📚' : activity.type === 'quiz' ? '📝' : '🏆'}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-gray-900">{activity.message}</p>
+                        <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                  <h3 className="font-semibold text-gray-900 mb-3">Statistiques d'apprentissage</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-500">Jours consécutifs</p>
+                      <p className="text-2xl font-bold text-emerald-600">7</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-500">Moyenne hebdomadaire</p>
+                      <p className="text-2xl font-bold text-emerald-600">4.5h</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

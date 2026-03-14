@@ -50,20 +50,16 @@ function ProgressQuizPage() {
       } catch (apiError) {
         console.log("API non disponible, calcul depuis localStorage");
         
-        // Calculer la progression depuis localStorage
         const enrolledIds = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
         const lessonsProgress = JSON.parse(localStorage.getItem('lesson-progress') || '{}');
         const quizResults = JSON.parse(localStorage.getItem('quizResults') || '[]');
         
-        // Compter les leçons complétées
         const completedLessons = Object.values(lessonsProgress).filter(v => v === true).length;
         
-        // Calculer le score moyen des quiz
         const avgScore = quizResults.length > 0
           ? Math.round(quizResults.reduce((acc, q) => acc + q.score, 0) / quizResults.length)
           : 0;
 
-        // Données simulées
         setProgressData({
           overall: Math.round((completedLessons / 30) * 100) || 64,
           completedLessons: completedLessons || 13,
@@ -99,7 +95,6 @@ function ProgressQuizPage() {
         });
         setQuizData(response.data);
       } catch (apiError) {
-        // Données simulées
         const mockQuizData = [
           { 
             id: 1, 
@@ -157,7 +152,6 @@ function ProgressQuizPage() {
         });
         setAvailableQuizzes(response.data);
       } catch (apiError) {
-        // Données simulées
         setAvailableQuizzes([
           { 
             id: 5, 
@@ -209,9 +203,8 @@ function ProgressQuizPage() {
   };
 
   const handleSubmitQuiz = () => {
-    // Simulation de correction
     const totalQuestions = selectedQuiz.questions || 10;
-    const correctCount = Math.floor(Math.random() * (totalQuestions - 5)) + 5; // Simulation
+    const correctCount = Math.floor(Math.random() * (totalQuestions - 5)) + 5;
     const score = Math.round((correctCount / totalQuestions) * 100);
     const passed = score >= 70;
 
@@ -223,7 +216,6 @@ function ProgressQuizPage() {
       answers: quizAnswers
     });
 
-    // Sauvegarder le résultat
     const newResult = {
       id: Date.now(),
       title: selectedQuiz.title,
@@ -269,16 +261,17 @@ function ProgressQuizPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* CORRECTION: Ajout des valeurs booléennes explicites */}
       <ToastContainer
         position="top-right"
         autoClose={4000}
         hideProgressBar={false}
-        newestOnTop
-        closeOnClick
+        newestOnTop={true}
+        closeOnClick={true}
         rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
+        pauseOnFocusLoss={true}
+        draggable={true}
+        pauseOnHover={true}
         theme="colored"
       />
 

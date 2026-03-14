@@ -1,0 +1,362 @@
+const express = require('express');
+const router = express.Router();
+const { protect, authorizeRoles } = require('../middlewares/authMiddleware'); // ← Changé ici
+const Cours = require('../models/Cours');
+const User = require('../models/User');
+
+// GET /api/cours/courslist - Récupérer tous les cours (public)
+router.get('/courslist', async (req, res) => {
+  try {
+    const { categorie, niveau, search, page = 1, limit = 10 } = req.query;
+    
+    let query = { status: 'Publié' };
+    
+    if (categorie) query.categorie = categorie;
+    if (niveau) query.niveau = niveau;
+    
+    if (search) {
+      query.$or = [
+        { titre: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const cours = await Cours.find(query)
+      .populate('instructeur', 'nom prenom email')
+      .sort('-createdAt')
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+    
+    const total = await Cours.countDocuments(query);
+    
+    res.json({ 
+      success: true, 
+      data: cours,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Erreur dans /courslist:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la récupération des cours',
+      error: error.message 
+    });
+  }
+});
+
+// GET /api/cours/:id - Récupérer un cours par ID (public)
+router.get('/:id', async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.id)
+      .populate('instructeur', 'nom prenom email')
+      .populate('students', 'nom prenom email');
+    
+    if (!cours) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Cours non trouvé' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      data: cours 
+    });
+  } catch (error) {
+    console.error('Erreur dans /cours/:id:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la récupération du cours',
+      error: error.message 
+    });
+  }
+});
+
+// POST /api/cours - Créer un cours (protégé - enseignant ou admin)
+router.post('/', protect, authorizeRoles('enseignant', 'admin'), async (req, res) => {
+  try {
+    const coursData = {
+      ...req.body,
+      instructeur: req.user._id,
+      status: req.body.status || 'Brouillon',
+      students: []
+    };
+    
+    const cours = new Cours(coursData);
+    await cours.save();
+    
+    res.status(201).json({ 
+      success: true, 
+      data: cours,
+      message: 'Cours créé avec succès' 
+    });
+  } catch (error) {
+    console.error('Erreur dans POST /cours:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Erreur de validation',
+        errors 
+      });
+    }
+    
+    res.status(400).json({ 
+      success: false, 
+      message: error.message || 'Erreur lors de la création du cours' 
+    });
+  }
+});
+
+// PUT /api/cours/:id - Mettre à jour un cours (protégé)
+router.put('/:id', protect, async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.id);
+    
+    if (!cours) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Cours non trouvé' 
+      });
+    }
+    
+    // Vérifier les droits (seul l'instructeur ou admin peut modifier)
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Vous n\'êtes pas autorisé à modifier ce cours' 
+      });
+    }
+    
+    const updatedCours = await Cours.findByIdAndUpdate(
+      req.params.id,
+      { 
+        ...req.body,
+        derniereMiseAJour: Date.now() 
+      },
+      { 
+        new: true,
+        runValidators: true
+      }
+    );
+    
+    res.json({ 
+      success: true, 
+      data: updatedCours,
+      message: 'Cours mis à jour avec succès' 
+    });
+  } catch (error) {
+    console.error('Erreur dans PUT /cours/:id:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Erreur de validation',
+        errors 
+      });
+    }
+    
+    res.status(400).json({ 
+      success: false, 
+      message: error.message || 'Erreur lors de la mise à jour' 
+    });
+  }
+});
+
+// DELETE /api/cours/:id - Supprimer un cours (protégé)
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.id);
+    
+    if (!cours) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Cours non trouvé' 
+      });
+    }
+    
+    // Vérifier les droits (seul l'instructeur ou admin peut supprimer)
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Vous n\'êtes pas autorisé à supprimer ce cours' 
+      });
+    }
+    
+    await cours.deleteOne();
+    
+    res.json({ 
+      success: true, 
+      message: 'Cours supprimé avec succès' 
+    });
+  } catch (error) {
+    console.error('Erreur dans DELETE /cours/:id:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Erreur lors de la suppression' 
+    });
+  }
+});
+
+// POST /api/cours/:id/inscrire - S'inscrire à un cours (protégé)
+router.post('/:id/inscrire', protect, async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.id);
+    
+    if (!cours) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Cours non trouvé' 
+      });
+    }
+    
+    // Vérifier si déjà inscrit
+    if (cours.students.includes(req.user._id)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Vous êtes déjà inscrit à ce cours' 
+      });
+    }
+    
+    cours.students.push(req.user._id);
+    await cours.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'Inscription réussie au cours' 
+    });
+  } catch (error) {
+    console.error('Erreur dans POST /cours/:id/inscrire:', error);
+    res.status(400).json({ 
+      success: false, 
+      message: error.message || 'Erreur lors de l\'inscription' 
+    });
+  }
+});
+
+// GET /api/cours/enseignant/mes-cours - Cours de l'enseignant connecté
+router.get('/enseignant/mes-cours', protect, authorizeRoles('enseignant', 'admin'), async (req, res) => {
+  try {
+    const cours = await Cours.find({ instructeur: req.user._id })
+      .sort('-createdAt');
+    
+    res.json({ 
+      success: true, 
+      data: cours 
+    });
+  } catch (error) {
+    console.error('Erreur dans /enseignant/mes-cours:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la récupération des cours' 
+    });
+  }
+});
+
+// GET /api/cours/etudiant/mes-cours - Cours de l'étudiant connecté
+router.get('/etudiant/mes-cours', protect, async (req, res) => {
+  try {
+    const cours = await Cours.find({ students: req.user._id })
+      .populate('instructeur', 'nom prenom')
+      .sort('-createdAt');
+    
+    res.json({ 
+      success: true, 
+      data: cours 
+    });
+  } catch (error) {
+    console.error('Erreur dans /etudiant/mes-cours:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la récupération des cours' 
+    });
+  }
+});
+
+// POST /api/cours/:id/avis - Ajouter un avis
+router.post('/:id/avis', protect, async (req, res) => {
+  try {
+    const { note, commentaire } = req.body;
+    
+    if (!note || note < 1 || note > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'La note doit être entre 1 et 5' 
+      });
+    }
+    
+    const cours = await Cours.findById(req.params.id);
+    
+    if (!cours) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Cours non trouvé' 
+      });
+    }
+    
+    // Vérifier si l'utilisateur est inscrit
+    if (!cours.students.includes(req.user._id)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Vous devez être inscrit pour laisser un avis' 
+      });
+    }
+    
+    // Vérifier si déjà avis
+    const dejaAvis = cours.avis.some(a => a.utilisateur.toString() === req.user._id.toString());
+    if (dejaAvis) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Vous avez déjà laissé un avis' 
+      });
+    }
+    
+    cours.avis.push({
+      utilisateur: req.user._id,
+      note,
+      commentaire,
+      date: Date.now()
+    });
+    
+    // Recalculer note moyenne
+    const totalNotes = cours.avis.reduce((sum, a) => sum + a.note, 0);
+    cours.rating = totalNotes / cours.avis.length;
+    cours.nombreAvis = cours.avis.length;
+    
+    await cours.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'Avis ajouté avec succès',
+      data: {
+        rating: cours.rating,
+        nombreAvis: cours.nombreAvis
+      }
+    });
+  } catch (error) {
+    console.error('Erreur dans POST /:id/avis:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Erreur lors de l\'ajout de l\'avis' 
+    });
+  }
+});
+
+// GET /api/health - Vérifier la santé du serveur
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date(),
+    service: 'Cours API',
+    version: '1.0.0'
+  });
+});
+
+module.exports = router;

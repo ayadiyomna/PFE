@@ -23,12 +23,12 @@ function Cours() {
 
   useEffect(() => {
     loadCourses();
-    loadFilters();
   }, []);
 
   useEffect(() => {
     applyFilters();
-  }, [filters, cours]);
+    extractFilters();
+  }, [cours]);
 
   const loadCourses = async () => {
     try {
@@ -44,14 +44,14 @@ function Cours() {
       } catch (apiError) {
         console.log("API non disponible, chargement des données locales");
         
-        // Récupérer les cours du localStorage
+        // Charger les cours du localStorage
         const localCourses = JSON.parse(localStorage.getItem('courses') || '[]');
         
         if (localCourses.length > 0) {
           setCours(localCourses);
         } else {
-          // Données simulées par défaut
-          const mockData = [
+          // Données par défaut si aucun cours
+          const defaultCourses = [
             {
               id: 1,
               titre: "Tajwid Avancé",
@@ -59,7 +59,7 @@ function Cours() {
               category: "Coran",
               niveau: "Expert",
               prix: 89,
-              image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=250&fit=crop",
+              image: "https://images.unsplash.com/photo-1609598429919-48079525b1a4?w=400&h=250&fit=crop",
               students: 234,
               rating: 4.9,
               instructor: "Cheikh Ahmed Al-Mansouri",
@@ -68,12 +68,12 @@ function Cours() {
             },
             {
               id: 2,
-              titre: "Arabe Classique",
+              titre: "Arabe Classique - Niveau 1",
               description: "Apprenez l'arabe classique depuis les bases jusqu'à la maîtrise",
-              category: "Langue",
+              category: "Langue Arabe",
               niveau: "Débutant",
               prix: 99,
-              image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&h=250&fit=crop",
+              image: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=400&h=250&fit=crop",
               students: 456,
               rating: 4.8,
               instructor: "Dr. Fatima Zahra",
@@ -82,12 +82,12 @@ function Cours() {
             },
             {
               id: 3,
-              titre: "Fiqh et Usul",
-              description: "Les fondements de la jurisprudence islamique",
+              titre: "Fiqh des Prières",
+              description: "Les fondements de la jurisprudence islamique concernant les prières",
               category: "Jurisprudence",
               niveau: "Intermédiaire",
               prix: 79,
-              image: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=250&fit=crop",
+              image: "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=400&h=250&fit=crop",
               students: 189,
               rating: 4.7,
               instructor: "Cheikh Mohammed Al-Hassan",
@@ -95,8 +95,8 @@ function Cours() {
               duration: "10 semaines"
             }
           ];
-          setCours(mockData);
-          localStorage.setItem('courses', JSON.stringify(mockData));
+          setCours(defaultCourses);
+          localStorage.setItem('courses', JSON.stringify(defaultCourses));
         }
       }
     } catch (error) {
@@ -107,8 +107,8 @@ function Cours() {
     }
   };
 
-  const loadFilters = () => {
-    // Charger les catégories et niveaux depuis les cours
+  const extractFilters = () => {
+    // Extraire les catégories et niveaux uniques
     const uniqueCategories = [...new Set(cours.map(c => c.category))];
     const uniqueLevels = [...new Set(cours.map(c => c.niveau))];
     setCategories(uniqueCategories);
@@ -205,6 +205,16 @@ function Cours() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    toast.success("👋 Déconnexion réussie");
+    setTimeout(() => {
+      navigate('/', { replace: true });
+    }, 1000);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <ToastContainer
@@ -234,12 +244,7 @@ function Cours() {
               <Link to="/login" className="text-gray-600 hover:text-emerald-600">Connexion</Link>
             ) : (
               <button
-                onClick={() => {
-                  localStorage.removeItem('token');
-                  localStorage.removeItem('user');
-                  navigate('/');
-                  toast.success("👋 Déconnexion réussie");
-                }}
+                onClick={handleLogout}
                 className="text-red-600 hover:text-red-700"
               >
                 Déconnexion
@@ -347,6 +352,7 @@ function Cours() {
                 value={filters.priceMax}
                 onChange={handleFilterChange}
                 placeholder="Max"
+                min="0"
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
@@ -393,14 +399,14 @@ function Cours() {
 
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-xl font-bold text-gray-900">{c.titre}</h3>
-                    <div className="flex items-center gap-1">
+                    <h3 className="text-xl font-bold text-gray-900 line-clamp-1">{c.titre}</h3>
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <span className="text-yellow-400">★</span>
                       <span className="font-semibold">{c.rating || 4.5}</span>
                     </div>
                   </div>
 
-                  <p className="text-sm text-gray-600 mb-2">{c.instructor || "Formateur"}</p>
+                  <p className="text-sm text-gray-600 mb-2 line-clamp-1">{c.instructor || "Formateur"}</p>
                   <p className="text-xs text-gray-500 mb-3">{c.category}</p>
 
                   <p className="text-sm text-gray-500 mb-4 line-clamp-2">
@@ -414,7 +420,11 @@ function Cours() {
                     </div>
                     <div className="flex items-center gap-1">
                       <span>📚</span>
-                      <span>{c.lessons || 20} leçons</span>
+                      <span>{c.lessons || c.curriculum?.length || 20} leçons</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>⏱️</span>
+                      <span>{c.duration || "8 sem"}</span>
                     </div>
                   </div>
 

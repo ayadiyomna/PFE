@@ -36,7 +36,6 @@ function LessonPlayer() {
   }, [courseId, lessonId]);
 
   useEffect(() => {
-    // Sauvegarder la progression toutes les 30 secondes
     const interval = setInterval(() => {
       if (isPlaying && videoRef.current) {
         saveProgress();
@@ -52,7 +51,6 @@ function LessonPlayer() {
       const token = localStorage.getItem('token');
       
       try {
-        // Charger le cours et la leçon depuis l'API
         const courseResponse = await axios.get(`${API_BASE}/cours/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -72,7 +70,6 @@ function LessonPlayer() {
       } catch (apiError) {
         console.log("API non disponible, chargement des données locales");
         
-        // Données simulées
         const mockCourse = {
           id: parseInt(courseId) || 1,
           titre: "Tajwid Avancé",
@@ -85,7 +82,7 @@ function LessonPlayer() {
           title: "Introduction aux règles de prononciation",
           description: "Dans cette leçon, nous aborderons les bases fondamentales de la prononciation arabe et les règles essentielles du Tajwid pour débutants.",
           videoUrl: "https://example.com/video.mp4",
-          duration: 930, // 15:30 en secondes
+          duration: 930,
           resources: [
             { id: 1, title: "PDF de la leçon", type: "pdf", url: "#", size: "2.5 MB" },
             { id: 2, title: "Exercices pratiques", type: "doc", url: "#", size: "1.8 MB" },
@@ -123,7 +120,6 @@ function LessonPlayer() {
     const progress = JSON.parse(localStorage.getItem(`lesson-progress-${courseId}`) || '{}');
     setCompleted(!!progress[lessonId]);
     
-    // Restaurer la position de la vidéo
     const position = progress[`${lessonId}-position`];
     if (position && videoRef.current) {
       videoRef.current.currentTime = position;
@@ -233,7 +229,6 @@ function LessonPlayer() {
   const handleComplete = () => {
     setCompleted(!completed);
     
-    // Mettre à jour la progression
     const progress = JSON.parse(localStorage.getItem(`lesson-progress-${courseId}`) || '{}');
     progress[lessonId] = !completed;
     localStorage.setItem(`lesson-progress-${courseId}`, JSON.stringify(progress));
@@ -241,7 +236,6 @@ function LessonPlayer() {
     if (!completed) {
       toast.success("✅ Leçon marquée comme terminée !");
       
-      // Vérifier si toutes les leçons sont terminées
       const allLessons = lessons.map(l => l.id);
       const completedLessons = Object.keys(progress).filter(key => 
         allLessons.includes(key) && progress[key] === true
@@ -250,7 +244,6 @@ function LessonPlayer() {
       if (completedLessons.length === allLessons.length) {
         toast.success("🎉 Félicitations ! Vous avez terminé toutes les leçons !");
         
-        // Proposer de passer le quiz final
         setTimeout(() => {
           if (window.confirm("Voulez-vous passer le quiz final maintenant ?")) {
             navigate(`/quiz/cours/${courseId}/final`);
@@ -274,7 +267,7 @@ function LessonPlayer() {
 
   const handleLessonSelect = (selectedLessonId) => {
     if (selectedLessonId !== lessonId) {
-      saveProgress(); // Sauvegarder avant de changer
+      saveProgress();
       navigate(`/cours/${courseId}/lecon/${selectedLessonId}`);
     }
   };
@@ -322,7 +315,6 @@ function LessonPlayer() {
 
   const handleDownloadResource = (resource) => {
     toast.info(`📥 Téléchargement de ${resource.title}...`);
-    // Simulation de téléchargement
     setTimeout(() => {
       toast.success(`✅ ${resource.title} téléchargé !`);
     }, 1000);
@@ -363,16 +355,17 @@ function LessonPlayer() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* CORRECTION: Ajout des valeurs booléennes explicites */}
       <ToastContainer
         position="top-right"
         autoClose={4000}
         hideProgressBar={false}
-        newestOnTop
-        closeOnClick
+        newestOnTop={true}
+        closeOnClick={true}
         rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
+        pauseOnFocusLoss={true}
+        draggable={true}
+        pauseOnHover={true}
         theme="colored"
       />
 
@@ -383,6 +376,7 @@ function LessonPlayer() {
               onClick={() => navigate(-1)}
               className="p-2 hover:bg-gray-100 rounded-lg transition"
               title="Retour"
+              aria-label="Retour"
             >
               ←
             </button>

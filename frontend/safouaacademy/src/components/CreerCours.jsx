@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import axios from "axios";
 
 function CreerCours() {
   const navigate = useNavigate();
+  const API_BASE = "http://localhost:5000/api";
 
-  // ✅ ÉTAT DU FORMULAIRE
+  // ÉTAT DU FORMULAIRE
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -15,74 +17,28 @@ function CreerCours() {
     language: "Français",
     duration: "",
     price: "",
-    imagePreview: ""
+    imagePreview: "",
+    objectives: [],
+    prerequisites: [],
+    curriculum: []
   });
 
-  // ✅ ÉTAT VALIDATION
+  // ÉTAT POUR LES OBJECTIFS ET PRÉREQUIS
+  const [newObjective, setNewObjective] = useState("");
+  const [newPrerequisite, setNewPrerequisite] = useState("");
+  const [newModule, setNewModule] = useState({ title: "", lessons: 0, duration: "" });
+
+  // ÉTAT VALIDATION
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // ✅ CATEGORIES DISPONIBLES
-  const categories = ["Coran", "Langue", "Jurisprudence", "Histoire"];
-  const levels = ["Débutant", "Intermédiaire", "Expert"];
+  // CATEGORIES DISPONIBLES
+  const categories = ["Coran", "Langue Arabe", "Jurisprudence", "Hadith", "Histoire", "Tajwid"];
+  const levels = ["Débutant", "Intermédiaire", "Avancé", "Expert"];
   const languages = ["Français", "Arabe", "Anglais"];
 
-  // ✅ FONCTION POUR NETTOYER LE LOCALSTORAGE SI NÉCESSAIRE
-  const cleanLocalStorage = () => {
-    try {
-      // Supprimer les anciennes données temporaires
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.includes('temp_') || key?.includes('cache_')) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach(key => localStorage.removeItem(key));
-      
-      // Limiter la taille des courses
-      const courses = JSON.parse(localStorage.getItem('teacherCourses') || '[]');
-      if (courses.length > 30) {
-        const trimmed = courses.slice(0, 30);
-        localStorage.setItem('teacherCourses', JSON.stringify(trimmed));
-      }
-      
-      return true;
-    } catch (error) {
-      console.error("Erreur nettoyage localStorage:", error);
-      return false;
-    }
-  };
-
-  // ✅ FONCTION POUR SAUVEGARDER AVEC GESTION QUOTA
-  const safeLocalStorageSet = (key, value) => {
-    try {
-      // Essayer de sauvegarder normalement
-      localStorage.setItem(key, value);
-      return true;
-    } catch (error) {
-      if (error.name === 'QuotaExceededError') {
-        toast.warning("⚠️ Espace de stockage insuffisant, nettoyage en cours...");
-        
-        // Nettoyer et réessayer
-        if (cleanLocalStorage()) {
-          try {
-            localStorage.setItem(key, value);
-            toast.success("✅ Sauvegarde réussie après nettoyage");
-            return true;
-          } catch (retryError) {
-            toast.error("❌ Toujours pas assez d'espace. Supprimez d'anciens cours.");
-            return false;
-          }
-        }
-      }
-      toast.error("❌ Erreur de sauvegarde");
-      return false;
-    }
-  };
-
-  // ✅ GESTION CHANGE INPUTS
+  // GESTION CHANGE INPUTS
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -90,7 +46,6 @@ function CreerCours() {
       [name]: value
     }));
 
-    // ✅ CLEAR ERROR SUR CHANGEMENT
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -99,11 +54,10 @@ function CreerCours() {
     }
   };
 
-  // ✅ GESTION IMAGE PREVIEW
+  // GESTION IMAGE PREVIEW
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Vérifier la taille de l'image (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         toast.error("❌ L'image ne doit pas dépasser 2MB");
         return;
@@ -120,7 +74,70 @@ function CreerCours() {
     }
   };
 
-  // ✅ VALIDATION FORMULAIRE
+  // AJOUTER UN OBJECTIF
+  const addObjective = () => {
+    if (newObjective.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        objectives: [...prev.objectives, newObjective.trim()]
+      }));
+      setNewObjective("");
+    }
+  };
+
+  // SUPPRIMER UN OBJECTIF
+  const removeObjective = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      objectives: prev.objectives.filter((_, i) => i !== index)
+    }));
+  };
+
+  // AJOUTER UN PRÉREQUIS
+  const addPrerequisite = () => {
+    if (newPrerequisite.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        prerequisites: [...prev.prerequisites, newPrerequisite.trim()]
+      }));
+      setNewPrerequisite("");
+    }
+  };
+
+  // SUPPRIMER UN PRÉREQUIS
+  const removePrerequisite = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      prerequisites: prev.prerequisites.filter((_, i) => i !== index)
+    }));
+  };
+
+  // AJOUTER UN MODULE
+  const addModule = () => {
+    if (newModule.title && newModule.lessons > 0 && newModule.duration) {
+      setFormData(prev => ({
+        ...prev,
+        curriculum: [...prev.curriculum, {
+          id: Date.now(),
+          ...newModule,
+          lessons: parseInt(newModule.lessons)
+        }]
+      }));
+      setNewModule({ title: "", lessons: 0, duration: "" });
+    } else {
+      toast.error("Veuillez remplir tous les champs du module");
+    }
+  };
+
+  // SUPPRIMER UN MODULE
+  const removeModule = (id) => {
+    setFormData(prev => ({
+      ...prev,
+      curriculum: prev.curriculum.filter(m => m.id !== id)
+    }));
+  };
+
+  // VALIDATION FORMULAIRE
   const validateForm = () => {
     const newErrors = {};
 
@@ -144,71 +161,91 @@ function CreerCours() {
     return true;
   };
 
-  // ✅ SOUMISSION FORMULAIRE
+  // SOUMISSION FORMULAIRE
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateForm()) return;
 
     setLoading(true);
-    
-    // ✅ SIMULATION API
-    setTimeout(() => {
+
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user'));
+
+      // Préparer les données du cours
+      const courseData = {
+        titre: formData.title,
+        description: formData.description,
+        category: formData.category,
+        niveau: formData.level,
+        language: formData.language,
+        duration: formData.duration,
+        prix: parseFloat(formData.price),
+        image: formData.imagePreview || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop",
+        instructor: user?.name || "Enseignant",
+        instructorId: user?.id,
+        objectives: formData.objectives,
+        prerequisites: formData.prerequisites,
+        curriculum: formData.curriculum,
+        students: 0,
+        rating: 0,
+        reviews: 0,
+        certificate: true,
+        lastUpdated: new Date().toISOString().split('T')[0],
+        status: "Publié"
+      };
+
       try {
-        console.log("Nouveau cours créé:", formData);
-        
-        // ✅ RÉCUPÉRER LES COURS EXISTANTS
-        let courses = [];
-        try {
-          courses = JSON.parse(localStorage.getItem('teacherCourses') || '[]');
-        } catch {
-          courses = [];
-        }
+        // Envoyer à l'API
+        const response = await axios.post(`${API_BASE}/cours`, courseData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
-        // ✅ CRÉER LE NOUVEAU COURS
-        const newCourse = {
-          id: Date.now(),
-          ...formData,
-          createdAt: new Date().toLocaleDateString('fr-FR'),
-          students: 0,
-          rating: 0,
-          status: "Brouillon"
-        };
-
-        // ✅ AJOUTER AU DÉBUT DU TABLEAU
-        courses.unshift(newCourse);
-
-        // ✅ LIMITER LE NOMBRE DE COURS (garder les 50 plus récents)
-        if (courses.length > 50) {
-          courses = courses.slice(0, 50);
-          toast.info("📚 Anciens cours nettoyés automatiquement");
-        }
-
-        // ✅ SAUVEGARDER AVEC GESTION QUOTA
-        const saved = safeLocalStorageSet('teacherCourses', JSON.stringify(courses));
-        
-        if (saved) {
+        if (response.data) {
           toast.success("✅ Cours créé avec succès !");
           setSuccess(true);
           
-          // ✅ REDIRECTION APRÈS 2s
           setTimeout(() => {
             navigate('/enseignant');
           }, 2000);
-        } else {
-          toast.error("❌ Échec de la sauvegarde");
-          setLoading(false);
         }
+      } catch (apiError) {
+        console.error("Erreur API:", apiError);
         
-      } catch (error) {
-        console.error("Erreur lors de la création:", error);
-        toast.error("❌ Erreur lors de la création du cours");
-        setLoading(false);
+        // Fallback: sauvegarder dans localStorage
+        const courses = JSON.parse(localStorage.getItem('courses') || '[]');
+        const teacherCourses = JSON.parse(localStorage.getItem('teacherCourses') || '[]');
+        
+        const newCourse = {
+          id: Date.now(),
+          ...courseData,
+          createdAt: new Date().toLocaleDateString('fr-FR')
+        };
+
+        courses.push(newCourse);
+        teacherCourses.unshift(newCourse);
+
+        localStorage.setItem('courses', JSON.stringify(courses));
+        localStorage.setItem('teacherCourses', JSON.stringify(teacherCourses));
+
+        toast.success("✅ Cours créé avec succès (mode hors-ligne) !");
+        setSuccess(true);
+        
+        setTimeout(() => {
+          navigate('/enseignant');
+        }, 2000);
       }
-    }, 1500);
+
+    } catch (error) {
+      console.error("Erreur lors de la création:", error);
+      toast.error("❌ Erreur lors de la création du cours");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ✅ FONCTION DÉCONNEXION
+  // FONCTION DÉCONNEXION
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -232,7 +269,7 @@ function CreerCours() {
         theme="colored"
       />
 
-      {/* HEADER IDENTIQUE */}
+      {/* HEADER */}
       <header className="bg-white shadow-md border-t-4 border-emerald-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
@@ -260,7 +297,7 @@ function CreerCours() {
       </header>
 
       {/* FORMULAIRE CRÉATION */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           
           {/* EN-TÊTE */}
@@ -296,10 +333,10 @@ function CreerCours() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-8">
                 
-                {/* COLONNE 1 - Infos principales */}
-                <div className="space-y-6">
+                {/* INFOS PRINCIPALES */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Titre du cours *
@@ -327,68 +364,68 @@ function CreerCours() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Description *
-                    </label>
-                    <textarea
-                      name="description"
-                      rows="4"
-                      value={formData.description}
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
+                    <select
+                      name="category"
+                      value={formData.category}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 resize-vertical transition ${
-                        errors.description 
+                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition ${
+                        errors.category 
                           ? 'border-red-300 focus:ring-red-500' 
                           : 'border-gray-200 focus:ring-emerald-500'
                       }`}
-                      placeholder="Décrivez votre cours en détail (minimum 20 caractères)..."
-                    />
-                    {errors.description && (
-                      <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" />
-                        </svg>
-                        {errors.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Catégorie *</label>
-                      <select
-                        name="category"
-                        value={formData.category}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition ${
-                          errors.category 
-                            ? 'border-red-300 focus:ring-red-500' 
-                            : 'border-gray-200 focus:ring-emerald-500'
-                        }`}
-                      >
-                        <option value="">Choisir une catégorie</option>
-                        {categories.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Niveau</label>
-                      <select
-                        name="level"
-                        value={formData.level}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      >
-                        {levels.map(lvl => (
-                          <option key={lvl} value={lvl}>{lvl}</option>
-                        ))}
-                      </select>
-                    </div>
+                    >
+                      <option value="">Choisir une catégorie</option>
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
-                {/* COLONNE 2 - Détails techniques */}
-                <div className="space-y-6">
+                {/* DESCRIPTION */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Description *
+                  </label>
+                  <textarea
+                    name="description"
+                    rows="4"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 resize-vertical transition ${
+                      errors.description 
+                        ? 'border-red-300 focus:ring-red-500' 
+                        : 'border-gray-200 focus:ring-emerald-500'
+                    }`}
+                    placeholder="Décrivez votre cours en détail (minimum 20 caractères)..."
+                  />
+                  {errors.description && (
+                    <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" />
+                      </svg>
+                      {errors.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* DÉTAILS */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Niveau</label>
+                    <select
+                      name="level"
+                      value={formData.level}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {levels.map(lvl => (
+                        <option key={lvl} value={lvl}>{lvl}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Langue</label>
                     <select
@@ -415,11 +452,8 @@ function CreerCours() {
                           ? 'border-red-300 focus:ring-red-500' 
                           : 'border-gray-200 focus:ring-emerald-500'
                       }`}
-                      placeholder="Ex: 8 semaines, 12 heures"
+                      placeholder="Ex: 8 semaines"
                     />
-                    {errors.duration && (
-                      <p className="mt-1 text-sm text-red-600">{errors.duration}</p>
-                    )}
                   </div>
 
                   <div>
@@ -438,68 +472,198 @@ function CreerCours() {
                       }`}
                       placeholder="0"
                     />
-                    {errors.price && (
-                      <p className="mt-1 text-sm text-red-600">{errors.price}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Image du cours (max 2MB)
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-emerald-400 transition cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
-                    />
-                    {formData.imagePreview && (
-                      <div className="mt-4 p-2 border border-gray-200 rounded-xl bg-gray-50">
-                        <img 
-                          src={formData.imagePreview} 
-                          alt="Preview" 
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* BOUTONS ACTIONS */}
-            {!success && (
-              <div className="flex gap-4 pt-8 border-t border-gray-100 mt-8">
-                <button
-                  type="button"
-                  onClick={() => navigate('/enseignant')}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-semibold transition"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition ${
-                    loading
-                      ? 'bg-emerald-400 cursor-not-allowed'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl'
-                  }`}
-                >
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                      Création en cours...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      Créer le cours
-                    </>
+                {/* OBJECTIFS D'APPRENTISSAGE */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Objectifs d'apprentissage</h3>
+                  
+                  <div className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={newObjective}
+                      onChange={(e) => setNewObjective(e.target.value)}
+                      placeholder="Ajouter un objectif..."
+                      className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addObjective())}
+                    />
+                    <button
+                      type="button"
+                      onClick={addObjective}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition"
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+
+                  <ul className="space-y-2">
+                    {formData.objectives.map((obj, index) => (
+                      <li key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <span className="text-gray-700">✓ {obj}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeObjective(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* PRÉREQUIS */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Prérequis</h3>
+                  
+                  <div className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={newPrerequisite}
+                      onChange={(e) => setNewPrerequisite(e.target.value)}
+                      placeholder="Ajouter un prérequis..."
+                      className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addPrerequisite())}
+                    />
+                    <button
+                      type="button"
+                      onClick={addPrerequisite}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition"
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+
+                  <ul className="space-y-2">
+                    {formData.prerequisites.map((pre, index) => (
+                      <li key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <span className="text-gray-700">📋 {pre}</span>
+                        <button
+                          type="button"
+                          onClick={() => removePrerequisite(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* PROGRAMME DU COURS */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Programme du cours</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={newModule.title}
+                      onChange={(e) => setNewModule({ ...newModule, title: e.target.value })}
+                      placeholder="Titre du module"
+                      className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <input
+                      type="number"
+                      value={newModule.lessons}
+                      onChange={(e) => setNewModule({ ...newModule, lessons: e.target.value })}
+                      placeholder="Nombre de leçons"
+                      className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <input
+                      type="text"
+                      value={newModule.duration}
+                      onChange={(e) => setNewModule({ ...newModule, duration: e.target.value })}
+                      placeholder="Durée (ex: 2h)"
+                      className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={addModule}
+                    className="w-full bg-emerald-100 text-emerald-700 px-4 py-3 rounded-lg hover:bg-emerald-200 transition font-semibold mb-4"
+                  >
+                    + Ajouter un module
+                  </button>
+
+                  <div className="space-y-3">
+                    {formData.curriculum.map((module, index) => (
+                      <div key={module.id} className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+                        <div>
+                          <span className="font-semibold text-gray-900">Module {index + 1}: {module.title}</span>
+                          <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                            <span>{module.lessons} leçons</span>
+                            <span>{module.duration}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeModule(module.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* IMAGE */}
+                <div className="border-t border-gray-200 pt-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Image du cours (max 2MB)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-emerald-400 transition cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                  />
+                  {formData.imagePreview && (
+                    <div className="mt-4 p-2 border border-gray-200 rounded-xl bg-gray-50">
+                      <img 
+                        src={formData.imagePreview} 
+                        alt="Preview" 
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    </div>
                   )}
-                </button>
+                </div>
+
+                {/* BOUTONS ACTIONS */}
+                <div className="flex gap-4 pt-8 border-t border-gray-100 mt-8">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/enseignant')}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-semibold transition"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition ${
+                      loading
+                        ? 'bg-emerald-400 cursor-not-allowed'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl'
+                    }`}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        Création en cours...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Créer le cours
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </form>

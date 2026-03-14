@@ -26,9 +26,7 @@ function Login() {
     setLoading(true);
 
     try {
-      // Simuler une connexion
       setTimeout(() => {
-        // Vérification simple (à remplacer par un vrai appel API)
         if (formData.email && formData.password) {
           const user = {
             id: 1,
@@ -40,10 +38,8 @@ function Login() {
           localStorage.setItem("token", "fake-jwt-token");
           localStorage.setItem("user", JSON.stringify(user));
 
-          // REMPLACER ALERT PAR TOAST
           toast.success("Connexion réussie !");
 
-          // Redirection selon le rôle
           switch(formData.role) {
             case "administrateur":
               navigate("/admin");
@@ -55,14 +51,12 @@ function Login() {
               navigate("/etudiant");
           }
         } else {
-          // REMPLACER ALERT PAR TOAST
           toast.error("Email ou mot de passe incorrect");
           setError("Email ou mot de passe incorrect");
         }
         setLoading(false);
       }, 1000);
     } catch (error) {
-      // REMPLACER ALERT PAR TOAST
       toast.error("Erreur de connexion");
       setError("Erreur de connexion");
       setLoading(false);
@@ -71,17 +65,17 @@ function Login() {
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
-      {/* AJOUT DU TOAST CONTAINER */}
+      {/* CORRECTION: Ajout des valeurs booléennes explicites */}
       <ToastContainer 
         position="top-right"
         autoClose={4000}
         hideProgressBar={false}
-        newestOnTop
-        closeOnClick
+        newestOnTop={true}
+        closeOnClick={true}
         rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
+        pauseOnFocusLoss={true}
+        draggable={true}
+        pauseOnHover={true}
         theme="colored"
       />
 

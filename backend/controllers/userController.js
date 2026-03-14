@@ -1,4 +1,3 @@
-// controllers/userController.js
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -7,11 +6,11 @@ const generateToken = (id) => {
   return jwt.sign(
     { id }, 
     process.env.JWT_SECRET || "secret_temporaire_123", 
-    { expiresIn: "30d" },
+    { expiresIn: "30d" }
   );
 };
 
-// REGISTER - avec hachage explicite
+// REGISTER
 const register = async (req, res) => {
   try {
     console.log("📝 Register - Données reçues:", {
@@ -38,13 +37,12 @@ const register = async (req, res) => {
       });
     }
     
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(mdp, salt);
+    // Créer l'utilisateur (le middleware pre('save') va hasher le mot de passe)
     const user = await User.create({
       nom,
       prenom,
       email,
-      mdp: hashedPassword,
+      mdp, // Pas besoin de hasher ici, le middleware le fera
       role: role || "etudiant"
     });
 
@@ -52,17 +50,12 @@ const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: {
-        _id: user._id,
-        nom: user.nom,
-        prenom: user.prenom,
-        email: user.email,
-        role: user.role
-      },
+      data: user.getPublicProfile(),
       token
     });
 
   } catch (error) {
+    console.error("❌ Erreur register:", error);
     
     if (error.code === 11000) {
       return res.status(400).json({ 
@@ -77,6 +70,8 @@ const register = async (req, res) => {
     });
   }
 };
+
+// LOGIN
 const login = async (req, res) => {
   try {
     const { email, mdp } = req.body;
@@ -87,6 +82,7 @@ const login = async (req, res) => {
         message: "Email et mot de passe requis" 
       });
     }
+    
     const user = await User.findOne({ email }).select("+mdp");
     
     if (!user) {
@@ -95,7 +91,16 @@ const login = async (req, res) => {
         message: "Email ou mot de passe incorrect" 
       });
     }
-    const isMatch = await bcrypt.compare(mdp, user.mdp);
+    
+    // Vérifier si le compte est actif
+    if (!user.active) {
+      return res.status(401).json({ 
+        success: false,
+        message: "Compte désactivé. Contactez l'administrateur." 
+      });
+    }
+    
+    const isMatch = await user.comparePassword(mdp);
     
     if (!isMatch) {
       return res.status(401).json({ 
@@ -104,42 +109,63 @@ const login = async (req, res) => {
       });
     }
     
+    // Mettre à jour la date de dernière connexion
+    user.lastLogin = new Date();
+    await user.save();
+    
     const token = generateToken(user._id);
     
     res.json({
       success: true,
-      data: {
-        _id: user._id,
-        nom: user.nom,
-        prenom: user.prenom,
-        email: user.email,
-        role: user.role
-      },
+      data: user.getPublicProfile(),
       token
     });
 
   } catch (error) {
+    console.error("❌ Erreur login:", error);
     res.status(500).json({ 
       success: false,
       message: "Erreur lors de la connexion" 
     });
   }
 };
+
+// GET PROFILE
+const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    res.json({
+      success: true,
+      data: user.getPublicProfile()
+    });
+  } catch (error) {
+    console.error("❌ Erreur getProfile:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// LISTER TOUS LES UTILISATEURS
 const listerutilisateurs = async (req, res) => {
   try {
-    const users = await User.find().select("-mdp");
+    const users = await User.find().select("-mdp").sort({ createdAt: -1 });
     res.json({ 
       success: true, 
       count: users.length,
       data: users 
     });
   } catch (error) {
+    console.error("❌ Erreur listerutilisateurs:", error);
     res.status(500).json({ 
       success: false,
       message: error.message 
     });
   }
 };
+
+// GET UTILISATEUR BY ID
 const getutilisateurById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-mdp");
@@ -154,19 +180,18 @@ const getutilisateurById = async (req, res) => {
       data: user 
     });
   } catch (error) {
+    console.error("❌ Erreur getutilisateurById:", error);
     res.status(500).json({ 
       success: false,
       message: error.message 
     });
   }
 };
+
+// UPDATE UTILISATEUR
 const updateutilisateur = async (req, res) => {
   try {
-    if (req.body.mdp) {
-      const salt = await bcrypt.genSalt(10);
-      req.body.mdp = await bcrypt.hash(req.body.mdp, salt);
-    }
-    
+    // Si le mot de passe est fourni, le middleware pre('save') le hashera
     const user = await User.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -185,12 +210,15 @@ const updateutilisateur = async (req, res) => {
       data: user 
     });
   } catch (error) {
+    console.error("❌ Erreur updateutilisateur:", error);
     res.status(500).json({ 
       success: false,
       message: error.message 
     });
   }
 };
+
+// DELETE UTILISATEUR
 const deleteutilisateur = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
@@ -205,6 +233,7 @@ const deleteutilisateur = async (req, res) => {
       message: "Utilisateur supprimé" 
     });
   } catch (error) {
+    console.error("❌ Erreur deleteutilisateur:", error);
     res.status(500).json({ 
       success: false,
       message: error.message 
@@ -215,6 +244,7 @@ const deleteutilisateur = async (req, res) => {
 module.exports = {
   register,
   login,
+  getProfile,
   listerutilisateurs,
   getutilisateurById,
   updateutilisateur,

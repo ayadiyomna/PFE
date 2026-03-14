@@ -33,52 +33,18 @@ function CourseDetail() {
           headers: { Authorization: `Bearer ${token}` }
         });
         setCourse(response.data);
-        toast.success("📚 Cours chargé avec succès");
       } catch (apiError) {
         console.log("API non disponible, chargement des données locales");
         
         // Chercher dans le localStorage
         const courses = JSON.parse(localStorage.getItem('courses') || '[]');
-        const foundCourse = courses.find(c => c.id === parseInt(id) || c.id === id);
+        const foundCourse = courses.find(c => c.id == id);
         
         if (foundCourse) {
           setCourse(foundCourse);
         } else {
-          // Données simulées
-          const mockCourse = {
-            id: parseInt(id) || 1,
-            titre: "Tajwid Avancé",
-            instructor: "Cheikh Ahmed Al-Mansouri",
-            niveau: "Expert",
-            description: "Maîtrisez les règles avancées du Tajwid pour une récitation parfaite du Coran. Ce cours approfondit les subtilités de la prononciation arabe et les règles de récitation.",
-            rating: 4.9,
-            reviews: 234,
-            duration: "8 semaines",
-            students: 234,
-            modules: 4,
-            prix: 89,
-            image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop",
-            objectives: [
-              "Comprendre les règles complexes du Tajwid",
-              "Améliorer la prononciation des lettres arabes",
-              "Maîtriser les pauses et les arrêts",
-              "Appliquer les règles dans la récitation"
-            ],
-            prerequisites: [
-              "Niveau intermédiaire en arabe",
-              "Connaissance de base du Tajwid"
-            ],
-            curriculum: [
-              { id: 1, title: "Introduction au Tajwid", lessons: 5, duration: "2h", video: "https://example.com/video1" },
-              { id: 2, title: "Les règles de prononciation", lessons: 8, duration: "4h", video: "https://example.com/video2" },
-              { id: 3, title: "Les pauses et arrêts", lessons: 6, duration: "3h", video: "https://example.com/video3" },
-              { id: 4, title: "Pratique avancée", lessons: 10, duration: "6h", video: "https://example.com/video4" }
-            ],
-            certificate: true,
-            language: "Français",
-            lastUpdated: "2026-01-15"
-          };
-          setCourse(mockCourse);
+          toast.error("Cours non trouvé");
+          navigate('/cours');
         }
       }
     } catch (error) {
@@ -107,12 +73,9 @@ function CourseDetail() {
         });
         setReviews(response.data);
       } catch (apiError) {
-        // Données simulées
-        setReviews([
-          { id: 1, user: "Mohamed A.", rating: 5, comment: "Excellent cours, très bien structuré !", date: "2026-02-15" },
-          { id: 2, user: "Fatima Z.", rating: 4, comment: "Très instructif, je recommande", date: "2026-02-10" },
-          { id: 3, user: "Ahmed K.", rating: 5, comment: "Le meilleur cours de Tajwid en ligne", date: "2026-02-05" }
-        ]);
+        // Charger les avis du localStorage
+        const localReviews = JSON.parse(localStorage.getItem(`reviews-${id}`) || '[]');
+        setReviews(localReviews);
       }
     } catch (error) {
       console.error("Erreur chargement avis:", error);
@@ -176,6 +139,14 @@ function CourseDetail() {
     }
   };
 
+  const handleTakeQuiz = () => {
+    if (isEnrolled) {
+      navigate(`/quiz/cours/${id}`);
+    } else {
+      toast.warning("🔒 Inscrivez-vous d'abord pour accéder aux quiz");
+    }
+  };
+
   const handleSubmitReview = async () => {
     if (!isEnrolled) {
       toast.warning("🔒 Vous devez être inscrit pour laisser un avis");
@@ -194,6 +165,7 @@ function CourseDetail() {
       const user = JSON.parse(localStorage.getItem('user'));
       
       const reviewData = {
+        id: Date.now(),
         userId: user?.id,
         userName: user?.name || "Utilisateur",
         rating: userReview.rating,
@@ -208,7 +180,7 @@ function CourseDetail() {
       } catch (apiError) {
         // Mode hors-ligne
         const allReviews = JSON.parse(localStorage.getItem(`reviews-${id}`) || '[]');
-        allReviews.push({ ...reviewData, id: Date.now() });
+        allReviews.push(reviewData);
         localStorage.setItem(`reviews-${id}`, JSON.stringify(allReviews));
       }
 
@@ -220,14 +192,6 @@ function CourseDetail() {
       toast.error("❌ Erreur lors de la publication");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleTakeQuiz = () => {
-    if (isEnrolled) {
-      navigate(`/quiz/cours/${id}`);
-    } else {
-      toast.warning("🔒 Inscrivez-vous d'abord pour accéder aux quiz");
     }
   };
 
@@ -316,7 +280,7 @@ function CourseDetail() {
             <img 
               alt={course.titre} 
               className="w-full h-full object-cover" 
-              src={course.image}
+              src={course.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop"}
             />
             <div className="absolute top-4 left-4 flex gap-2">
               <span className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-full font-semibold">
@@ -338,8 +302,8 @@ function CourseDetail() {
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-yellow-400 text-2xl">★</span>
-                <span className="text-2xl font-bold text-gray-900">{course.rating}</span>
-                <span className="text-gray-500">({course.reviews} avis)</span>
+                <span className="text-2xl font-bold text-gray-900">{course.rating || 4.5}</span>
+                <span className="text-gray-500">({course.reviews || 0} avis)</span>
               </div>
             </div>
 
@@ -357,14 +321,14 @@ function CourseDetail() {
                 <span className="text-2xl">👥</span>
                 <div>
                   <p className="text-sm text-gray-500">Étudiants</p>
-                  <p className="font-semibold text-gray-900">{course.students}</p>
+                  <p className="font-semibold text-gray-900">{course.students || 0}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
                 <span className="text-2xl">📚</span>
                 <div>
                   <p className="text-sm text-gray-500">Modules</p>
-                  <p className="font-semibold text-gray-900">{course.modules}</p>
+                  <p className="font-semibold text-gray-900">{course.curriculum?.length || 0}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
@@ -448,30 +412,34 @@ function CourseDetail() {
         {activeTab === "apercu" && (
           <div className="space-y-6">
             {/* Objectifs */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Objectifs d'apprentissage</h2>
-              <ul className="space-y-2">
-                {course.objectives?.map((objective, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <span className="text-emerald-600 text-lg">✓</span>
-                    <span className="text-gray-700">{objective}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {course.objectives && course.objectives.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Objectifs d'apprentissage</h2>
+                <ul className="space-y-2">
+                  {course.objectives.map((objective, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="text-emerald-600 text-lg">✓</span>
+                      <span className="text-gray-700">{objective}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Prérequis */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Prérequis</h2>
-              <ul className="space-y-2">
-                {course.prerequisites?.map((prerequisite, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <span className="text-emerald-600 text-lg">📋</span>
-                    <span className="text-gray-700">{prerequisite}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {course.prerequisites && course.prerequisites.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Prérequis</h2>
+                <ul className="space-y-2">
+                  {course.prerequisites.map((prerequisite, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="text-emerald-600 text-lg">📋</span>
+                      <span className="text-gray-700">{prerequisite}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Informations complémentaires */}
             <div className="bg-white rounded-xl shadow-sm p-6">
@@ -485,6 +453,14 @@ function CourseDetail() {
                   <p className="text-sm text-gray-500">Certificat</p>
                   <p className="font-semibold text-gray-900">{course.certificate ? "Oui" : "Non"}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-500">Catégorie</p>
+                  <p className="font-semibold text-gray-900">{course.category}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Langue</p>
+                  <p className="font-semibold text-gray-900">{course.language}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -493,37 +469,41 @@ function CourseDetail() {
         {activeTab === "programme" && (
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Programme du cours</h2>
-            <div className="space-y-3">
-              {course.curriculum?.map((module, index) => (
-                <div 
-                  key={module.id} 
-                  className={`border border-gray-200 rounded-lg p-4 transition ${
-                    isEnrolled ? 'hover:shadow-md cursor-pointer' : 'opacity-75'
-                  }`}
-                  onClick={() => handleModuleClick(module.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{module.title}</h3>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                          <span>{module.lessons} leçons</span>
-                          <span>{module.duration}</span>
+            {course.curriculum && course.curriculum.length > 0 ? (
+              <div className="space-y-3">
+                {course.curriculum.map((module, index) => (
+                  <div 
+                    key={module.id || index} 
+                    className={`border border-gray-200 rounded-lg p-4 transition ${
+                      isEnrolled ? 'hover:shadow-md cursor-pointer' : 'opacity-75'
+                    }`}
+                    onClick={() => handleModuleClick(module.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{module.title}</h3>
+                          <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                            <span>{module.lessons} leçons</span>
+                            <span>{module.duration}</span>
+                          </div>
                         </div>
                       </div>
+                      {isEnrolled ? (
+                        <span className="text-emerald-600">▶</span>
+                      ) : (
+                        <span className="text-xs text-gray-400">🔒</span>
+                      )}
                     </div>
-                    {isEnrolled ? (
-                      <span className="text-emerald-600">▶</span>
-                    ) : (
-                      <span className="text-xs text-gray-400">🔒</span>
-                    )}
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-8">Programme en cours de préparation</p>
+            )}
             {!isEnrolled && (
               <p className="text-sm text-gray-500 mt-4 text-center">
                 Inscrivez-vous pour accéder au contenu du cours
@@ -547,6 +527,7 @@ function CourseDetail() {
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
+                          type="button"
                           onClick={() => setUserReview({ ...userReview, rating: star })}
                           className={`text-3xl transition ${
                             star <= userReview.rating ? 'text-yellow-400' : 'text-gray-300'
@@ -570,6 +551,7 @@ function CourseDetail() {
                     ></textarea>
                   </div>
                   <button
+                    type="button"
                     onClick={handleSubmitReview}
                     disabled={submitting}
                     className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold"
@@ -589,7 +571,7 @@ function CourseDetail() {
                     <div key={review.id} className="border-b border-gray-100 pb-4 last:border-0">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-900">{review.user}</span>
+                          <span className="font-semibold text-gray-900">{review.userName || review.user}</span>
                           <div className="flex items-center gap-1">
                             {[...Array(5)].map((_, i) => (
                               <span key={i} className={i < review.rating ? 'text-yellow-400' : 'text-gray-300'}>★</span>
