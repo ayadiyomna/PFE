@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const path = require("path");
+const chatRoutes = require('./routes/chatRoutes');
 
 dotenv.config();
 
@@ -31,7 +32,7 @@ app.use((req, res, next) => {
   console.log(`📌 ${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
-
+app.use(express.json());
 // ✅ ROUTE HEALTH CHECK - AJOUTÉE ICI
 app.get("/api/health", (req, res) => {
   res.status(200).json({ 
@@ -47,6 +48,7 @@ app.get("/api/health", (req, res) => {
 // Routes principales
 app.use("/api/users", userRoutes);
 app.use("/api/cours", coursRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Route de test racine
 app.get("/", (req, res) => {

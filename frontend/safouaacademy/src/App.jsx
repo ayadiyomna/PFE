@@ -21,6 +21,7 @@ import LessonPlayer from "./pages/LessonPlayer";
 import ProgressQuizPage from "./pages/ProgressQuizPage";
 import CertificatesPage from "./pages/CertificatesPage";
 import CreerCours from './components/CreerCours';
+import ChatWidget from './components/ChatWidget';
 
 // Composant de route protégée (amélioré)
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -120,148 +121,151 @@ const NotFoundPage = () => (
 
 function App() {
   return (
-    <BrowserRouter>
-      <ToastContainer
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop={true}
-        closeOnClick={true}
-        rtl={false}
-        pauseOnFocusLoss={true}
-        draggable={true}
-        pauseOnHover={true}
-        theme="colored"
-        limit={3}
-      />
-      
-      {/* Composant de synchronisation */}
-      <SyncStatus />
-      
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-indigo-100">
-        <Routes>
-          {/* Routes publiques */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/cours" element={<Cours />} />
-          <Route path="/cours/:id" element={<CourseDetail />} />
-          
-          {/* Routes protégées - Étudiant */}
-          <Route path="/etudiant" element={
-            <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
-              <EtudiantDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/etudiant/progression" element={
-            <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
-              <ProgressQuizPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/etudiant/certificats" element={
-            <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
-              <CertificatesPage />
-            </ProtectedRoute>
-          } />
-          
-          {/* Routes des cours */}
-          <Route path="/cours/:courseId/lecon/:lessonId" element={
-            <ProtectedRoute allowedRoles={['etudiant', 'enseignant', 'admin']}>
-              <LessonPlayer />
-            </ProtectedRoute>
-          } />
-          <Route path="/quiz/cours/:courseId" element={
-            <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
-              <ProgressQuizPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/quiz/cours/:courseId/final" element={
-            <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
-              <ProgressQuizPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/quiz/revision/:quizId" element={
-            <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
-              <ProgressQuizPage />
-            </ProtectedRoute>
-          } />
-          
-          {/* Routes protégées - Enseignant */}
-          <Route path="/enseignant" element={
-            <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
-              <EnseignantDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/enseignant/creer-cours" element={
-            <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
-              <CreerCours />
-            </ProtectedRoute>
-          } />
-          <Route path="/enseignant/modifier-cours/:id" element={
-            <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
-              <CreerCours isEditing={true} />
-            </ProtectedRoute>
-          } />
-          <Route path="/enseignant/statistiques/:courseId" element={
-            <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
-              <EnseignantDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/enseignant/analytiques" element={
-            <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
-              <EnseignantDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/enseignant/parametres" element={
-            <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold mb-4">Paramètres enseignant</h1>
-                <p className="text-gray-600">Page en construction</p>
-              </div>
-            </ProtectedRoute>
-          } />
-          
-          {/* Routes protégées - Admin */}
-          <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/etudiants" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/etudiants/:id" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/cours" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/parametres" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold mb-4">Paramètres administrateur</h1>
-                <p className="text-gray-600">Page en construction</p>
-              </div>
-            </ProtectedRoute>
-          } />
-          
-          {/* Redirections */}
-          <Route path="/CourseDetail" element={<Navigate to="/cours" replace />} />
-          <Route path="/certificat" element={<Navigate to="/etudiant/certificats" replace />} />
-          <Route path="/lecon" element={<Navigate to="/cours" replace />} />
-          <Route path="/quizz" element={<Navigate to="/etudiant/progression" replace />} />
-          
-          {/* Route 404 */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+    <>
+      <BrowserRouter>
+        <ToastContainer
+          position="top-right"
+          autoClose={4000}
+          hideProgressBar={false}
+          newestOnTop={true}
+          closeOnClick={true}
+          rtl={false}
+          pauseOnFocusLoss={true}
+          draggable={true}
+          pauseOnHover={true}
+          theme="colored"
+          limit={3}
+        />
+        
+        {/* Composant de synchronisation */}
+        <SyncStatus />
+        
+        <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-indigo-100">
+          <Routes>
+            {/* Routes publiques */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/cours" element={<Cours />} />
+            <Route path="/cours/:id" element={<CourseDetail />} />
+            
+            {/* Routes protégées - Étudiant */}
+            <Route path="/etudiant" element={
+              <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
+                <EtudiantDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/etudiant/progression" element={
+              <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
+                <ProgressQuizPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/etudiant/certificats" element={
+              <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
+                <CertificatesPage />
+              </ProtectedRoute>
+            } />
+            
+            {/* Routes des cours */}
+            <Route path="/cours/:courseId/lecon/:lessonId" element={
+              <ProtectedRoute allowedRoles={['etudiant', 'enseignant', 'admin']}>
+                <LessonPlayer />
+              </ProtectedRoute>
+            } />
+            <Route path="/quiz/cours/:courseId" element={
+              <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
+                <ProgressQuizPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/quiz/cours/:courseId/final" element={
+              <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
+                <ProgressQuizPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/quiz/revision/:quizId" element={
+              <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
+                <ProgressQuizPage />
+              </ProtectedRoute>
+            } />
+            
+            {/* Routes protégées - Enseignant */}
+            <Route path="/enseignant" element={
+              <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
+                <EnseignantDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/enseignant/creer-cours" element={
+              <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
+                <CreerCours />
+              </ProtectedRoute>
+            } />
+            <Route path="/enseignant/modifier-cours/:id" element={
+              <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
+                <CreerCours isEditing={true} />
+              </ProtectedRoute>
+            } />
+            <Route path="/enseignant/statistiques/:courseId" element={
+              <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
+                <EnseignantDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/enseignant/analytiques" element={
+              <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
+                <EnseignantDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/enseignant/parametres" element={
+              <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold mb-4">Paramètres enseignant</h1>
+                  <p className="text-gray-600">Page en construction</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            {/* Routes protégées - Admin */}
+            <Route path="/admin" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/etudiants" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/etudiants/:id" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/cours" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/parametres" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold mb-4">Paramètres administrateur</h1>
+                  <p className="text-gray-600">Page en construction</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            {/* Redirections */}
+            <Route path="/CourseDetail" element={<Navigate to="/cours" replace />} />
+            <Route path="/certificat" element={<Navigate to="/etudiant/certificats" replace />} />
+            <Route path="/lecon" element={<Navigate to="/cours" replace />} />
+            <Route path="/quizz" element={<Navigate to="/etudiant/progression" replace />} />
+            
+            {/* Route 404 */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </div>
+      </BrowserRouter>
+      <ChatWidget />
+    </>
   );
 }
 
