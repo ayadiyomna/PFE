@@ -7,7 +7,8 @@ dotenv.config();
 
 const seedDatabase = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/safoua_academy";
+    await mongoose.connect(MONGO_URI);
     console.log("📦 Connecté à MongoDB pour le seeding");
 
     // Nettoyer les collections
@@ -41,11 +42,6 @@ const seedDatabase = async () => {
       role: "etudiant"
     });
 
-    console.log("✅ Utilisateurs créés avec succès");
-    console.log("\n📝 Identifiants de test :");
-    console.log("Admin: admin@example.com / admin123");
-    console.log("Enseignant: ahmed@example.com / password123");
-    console.log("Étudiant: mohamed@example.com / password123");
 
     process.exit(0);
   } catch (error) {

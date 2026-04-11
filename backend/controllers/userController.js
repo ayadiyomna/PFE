@@ -140,9 +140,9 @@ const login = async (req, res) => {
       });
     }
     
-    // NE PAS sauvegarder l'utilisateur pour éviter le middleware pre('save')
-    // user.lastLogin = new Date();
-    // await user.save(); // ← Commenté pour éviter l'erreur next is not a function
+    // Sauvegarder la date de dernière connexion
+    user.lastLogin = new Date();
+    await user.save();
     
     const token = generateToken(user._id);
     

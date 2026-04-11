@@ -35,7 +35,7 @@ function AdminDashboard() {
     
     if (!token) {
       console.log("Pas de token, redirection vers login");
-      window.location.href = '/login';
+      navigate('/login');
       return;
     }
     
@@ -50,15 +50,15 @@ function AdminDashboard() {
           setIsAuthorized(true);
         } else {
           console.log("❌ Pas admin, redirection vers home");
-          window.location.href = '/';
+          navigate('/');
         }
       } catch (error) {
         console.error("Erreur parsing user:", error);
-        window.location.href = '/login';
+        navigate('/login');
       }
     } else {
       console.log("Pas d'utilisateur, redirection vers login");
-      window.location.href = '/login';
+      navigate('/login');
     }
   }, []);
 
@@ -66,7 +66,7 @@ function AdminDashboard() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('role');
-    window.location.href = '/login';
+    navigate('/login');
   };
 
   const handleInputChange = (e) => {

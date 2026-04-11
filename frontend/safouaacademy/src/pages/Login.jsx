@@ -45,19 +45,19 @@ function Login() {
         // Redirection en fonction du rôle normalisé
         if (normalizedRole === 'admin') {
           console.log("🚀 Redirection vers /admin");
-          window.location.href = '/admin';
+          navigate('/admin');
         } 
         else if (normalizedRole === 'enseignant') {
           console.log("🚀 Redirection vers /enseignant");
-          window.location.href = '/enseignant';
+          navigate('/enseignant');
         } 
         else if (normalizedRole === 'etudiant') {
           console.log("🚀 Redirection vers /etudiant");
-          window.location.href = '/etudiant';
+          navigate('/etudiant');
         }
         else {
           console.log("⚠️ Rôle inconnu, redirection vers /");
-          window.location.href = '/';
+          navigate('/');
         }
       } else {
         setError(result.message || "Email ou mot de passe incorrect");

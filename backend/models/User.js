@@ -59,23 +59,17 @@ const userSchema = new mongoose.Schema({
 });
 
 // Middleware pour hasher le mot de passe avant sauvegarde
-// Version utilisant une fonction normale (pas async)
-userSchema.pre('save', function(next) {
+// Version utilisant une fonction async pour compatibilité avec les promesses
+userSchema.pre('save', async function() {
   const user = this;
   
   // Ne hasher que si le mot de passe est modifié
   if (!user.isModified('mdp')) {
-    return next();
+    return;
   }
   
   // Hasher le mot de passe avec bcrypt
-  bcrypt.hash(user.mdp, 10, (err, hash) => {
-    if (err) {
-      return next(err);
-    }
-    user.mdp = hash;
-    next();
-  });
+  user.mdp = await bcrypt.hash(user.mdp, 10);
 });
 
 // Méthode pour comparer les mots de passe

@@ -136,13 +136,12 @@ coursSchema.index({
 });
 
 // Middleware pour calculer la durée totale avant sauvegarde
-coursSchema.pre('save', function(next) {
+coursSchema.pre('save', function() {
   if (this.modules && this.modules.length > 0) {
     this.dureeTotale = this.modules.reduce((total, module) => {
       return total + (module.duree || 0);
     }, 0);
   }
-  next();
 });
 
 module.exports = mongoose.model('Cours', coursSchema);
