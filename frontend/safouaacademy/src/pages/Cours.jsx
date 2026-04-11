@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import axios from "axios";
+import coursService from "../services/coursService";
+import authService from "../services/authService";
+import api from "../services/api";
 
 function Cours() {
   const navigate = useNavigate();
@@ -18,99 +19,42 @@ function Cours() {
   });
   const [categories, setCategories] = useState([]);
   const [levels, setLevels] = useState([]);
-
-  const API_BASE = "http://localhost:5000/api";
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsAuthenticated(!!token);
+    
+    const enrolled = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
+    setEnrolledCourses(enrolled);
+    
     loadCourses();
   }, []);
 
   useEffect(() => {
     applyFilters();
     extractFilters();
-  }, [cours]);
+  }, [cours, filters]);
 
   const loadCourses = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const result = await coursService.getAllCours();
       
-      try {
-        const response = await axios.get(`${API_BASE}/cours`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setCours(response.data);
-        toast.success(`📚 ${response.data.length} cours chargés`);
-      } catch (apiError) {
-        console.log("API non disponible, chargement des données locales");
-        
-        // Charger les cours du localStorage
-        const localCourses = JSON.parse(localStorage.getItem('courses') || '[]');
-        
-        if (localCourses.length > 0) {
-          setCours(localCourses);
-        } else {
-          // Données par défaut si aucun cours
-          const defaultCourses = [
-            {
-              id: 1,
-              titre: "Tajwid Avancé",
-              description: "Maîtrisez les règles avancées du Tajwid pour une récitation parfaite du Coran",
-              category: "Coran",
-              niveau: "Expert",
-              prix: 89,
-              image: "https://images.unsplash.com/photo-1609598429919-48079525b1a4?w=400&h=250&fit=crop",
-              students: 234,
-              rating: 4.9,
-              instructor: "Cheikh Ahmed Al-Mansouri",
-              lessons: 24,
-              duration: "8 semaines"
-            },
-            {
-              id: 2,
-              titre: "Arabe Classique - Niveau 1",
-              description: "Apprenez l'arabe classique depuis les bases jusqu'à la maîtrise",
-              category: "Langue Arabe",
-              niveau: "Débutant",
-              prix: 99,
-              image: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=400&h=250&fit=crop",
-              students: 456,
-              rating: 4.8,
-              instructor: "Dr. Fatima Zahra",
-              lessons: 36,
-              duration: "12 semaines"
-            },
-            {
-              id: 3,
-              titre: "Fiqh des Prières",
-              description: "Les fondements de la jurisprudence islamique concernant les prières",
-              category: "Jurisprudence",
-              niveau: "Intermédiaire",
-              prix: 79,
-              image: "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=400&h=250&fit=crop",
-              students: 189,
-              rating: 4.7,
-              instructor: "Cheikh Mohammed Al-Hassan",
-              lessons: 30,
-              duration: "10 semaines"
-            }
-          ];
-          setCours(defaultCourses);
-          localStorage.setItem('courses', JSON.stringify(defaultCourses));
-        }
+      if (result.success) {
+        setCours(result.data);
       }
     } catch (error) {
       console.error("Erreur chargement cours:", error);
-      toast.error("❌ Erreur lors du chargement des cours");
     } finally {
       setLoading(false);
     }
   };
 
   const extractFilters = () => {
-    // Extraire les catégories et niveaux uniques
-    const uniqueCategories = [...new Set(cours.map(c => c.category))];
-    const uniqueLevels = [...new Set(cours.map(c => c.niveau))];
+    const uniqueCategories = [...new Set(cours.map(c => c.categorie).filter(Boolean))];
+    const uniqueLevels = [...new Set(cours.map(c => c.niveau).filter(Boolean))];
     setCategories(uniqueCategories);
     setLevels(uniqueLevels);
   };
@@ -119,7 +63,7 @@ function Cours() {
     let filtered = [...cours];
     
     if (filters.category) {
-      filtered = filtered.filter(c => c.category === filters.category);
+      filtered = filtered.filter(c => c.categorie === filters.category);
     }
     
     if (filters.level) {
@@ -129,9 +73,10 @@ function Cours() {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(c => 
-        c.titre.toLowerCase().includes(searchLower) ||
+        c.titre?.toLowerCase().includes(searchLower) ||
         c.description?.toLowerCase().includes(searchLower) ||
-        c.instructor?.toLowerCase().includes(searchLower)
+        c.instructeur?.nom?.toLowerCase().includes(searchLower) ||
+        c.instructeur?.prenom?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -148,10 +93,7 @@ function Cours() {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
   const resetFilters = () => {
@@ -162,7 +104,6 @@ function Cours() {
       priceMin: "",
       priceMax: ""
     });
-    toast.info("🔄 Filtres réinitialisés");
   };
 
   const handleViewCourse = (courseId) => {
@@ -172,65 +113,34 @@ function Cours() {
   const handleEnrollCourse = async (courseId, e) => {
     e.stopPropagation();
     
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user) {
-      toast.warning("🔐 Connectez-vous pour vous inscrire");
+    if (!isAuthenticated) {
       navigate('/login');
       return;
     }
 
     try {
-      toast.info("📝 Inscription en cours...");
-      
-      const token = localStorage.getItem('token');
-      
-      try {
-        await axios.post(`${API_BASE}/cours/${courseId}/inscrire`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        toast.success("✅ Inscription réussie !");
-      } catch (apiError) {
-        // Mode hors-ligne
-        const enrolled = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-        if (!enrolled.includes(courseId)) {
-          enrolled.push(courseId);
-          localStorage.setItem('enrolledCourses', JSON.stringify(enrolled));
-          toast.success("✅ Inscription réussie (mode hors-ligne)");
-        } else {
-          toast.info("📚 Vous êtes déjà inscrit à ce cours");
-        }
+      const result = await coursService.enrollToCours(courseId);
+      if (result.success) {
+        setEnrolledCourses(prev => [...prev, courseId]);
+        loadCourses(); // Recharger pour mettre à jour le nombre d'étudiants
       }
     } catch (error) {
-      toast.error("❌ Erreur lors de l'inscription");
+      console.error("Erreur lors de l'inscription:", error);
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    toast.success("👋 Déconnexion réussie");
-    setTimeout(() => {
-      navigate('/', { replace: true });
-    }, 1000);
+    authService.logout();
+    setIsAuthenticated(false);
+    navigate('/', { replace: true });
+  };
+
+  const isEnrolled = (courseId) => {
+    return enrolledCourses.includes(courseId.toString()) || enrolledCourses.includes(courseId);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToastContainer
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
-
-      {/* Header */}
       <header className="bg-white shadow-md border-t-4 border-emerald-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
@@ -240,7 +150,7 @@ function Cours() {
           <nav className="hidden md:flex space-x-8">
             <Link to="/" className="text-gray-600 hover:text-emerald-600">Accueil</Link>
             <Link to="/cours" className="text-emerald-600 font-semibold">Catalogue</Link>
-            {!localStorage.getItem('token') ? (
+            {!isAuthenticated ? (
               <Link to="/login" className="text-gray-600 hover:text-emerald-600">Connexion</Link>
             ) : (
               <button
@@ -252,7 +162,7 @@ function Cours() {
             )}
           </nav>
           
-          {!localStorage.getItem('token') ? (
+          {!isAuthenticated ? (
             <Link 
               to="/login"
               className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
@@ -261,7 +171,7 @@ function Cours() {
             </Link>
           ) : (
             <button
-              onClick={() => navigate('/compte')}
+              onClick={() => navigate('/etudiant')}
               className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
             >
               Mon compte
@@ -270,12 +180,10 @@ function Cours() {
         </div>
       </header>
 
-      {/* Contenu principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         <h1 className="text-3xl font-bold text-gray-900 mb-6">Nos Cours Disponibles</h1>
 
-        {/* Filtres */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Filtres</h2>
@@ -290,7 +198,6 @@ function Cours() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Recherche */}
             <div className="lg:col-span-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Rechercher
@@ -305,7 +212,6 @@ function Cours() {
               />
             </div>
 
-            {/* Catégorie */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Catégorie
@@ -323,7 +229,6 @@ function Cours() {
               </select>
             </div>
 
-            {/* Niveau */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Niveau
@@ -341,7 +246,6 @@ function Cours() {
               </select>
             </div>
 
-            {/* Prix */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Prix max (DT)
@@ -359,12 +263,10 @@ function Cours() {
           </div>
         </div>
 
-        {/* Résultats */}
         <p className="text-gray-600 mb-4">
           {filteredCourses.length} cours trouvés
         </p>
 
-        {/* Grille des cours */}
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600"></div>
@@ -373,13 +275,13 @@ function Cours() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCourses.map((c) => (
               <div 
-                key={c.id} 
+                key={c._id} 
                 className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition cursor-pointer group"
-                onClick={() => handleViewCourse(c.id)}
+                onClick={() => handleViewCourse(c._id)}
               >
                 <div className="relative h-48 overflow-hidden">
                   <img
-                    src={c.image || "https://via.placeholder.com/400x200?text=Cours"}
+                    src={c.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=200&fit=crop"}
                     alt={c.titre}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
@@ -395,6 +297,13 @@ function Cours() {
                       </span>
                     </div>
                   )}
+                  {isEnrolled(c._id) && (
+                    <div className="absolute bottom-3 right-3">
+                      <span className="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                        Inscrit ✓
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-5">
@@ -406,8 +315,10 @@ function Cours() {
                     </div>
                   </div>
 
-                  <p className="text-sm text-gray-600 mb-2 line-clamp-1">{c.instructor || "Formateur"}</p>
-                  <p className="text-xs text-gray-500 mb-3">{c.category}</p>
+                  <p className="text-sm text-gray-600 mb-2 line-clamp-1">
+                    {c.instructeur?.prenom} {c.instructeur?.nom}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-3">{c.categorie}</p>
 
                   <p className="text-sm text-gray-500 mb-4 line-clamp-2">
                     {c.description}
@@ -416,15 +327,15 @@ function Cours() {
                   <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
                     <div className="flex items-center gap-1">
                       <span>👥</span>
-                      <span>{c.students || Math.floor(Math.random() * 300) + 50}</span>
+                      <span>{c.students?.length || 0}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>📚</span>
-                      <span>{c.lessons || c.curriculum?.length || 20} leçons</span>
+                      <span>{c.modules?.length || 0} modules</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>⏱️</span>
-                      <span>{c.duration || "8 sem"}</span>
+                      <span>{c.dureeTotale || 0} min</span>
                     </div>
                   </div>
 
@@ -433,10 +344,15 @@ function Cours() {
                       {c.prix === 0 ? "Gratuit" : `${c.prix} DT`}
                     </span>
                     <button
-                      onClick={(e) => handleEnrollCourse(c.id, e)}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
+                      onClick={(e) => handleEnrollCourse(c._id, e)}
+                      disabled={isEnrolled(c._id)}
+                      className={`px-4 py-2 rounded-lg transition font-semibold text-sm ${
+                        isEnrolled(c._id)
+                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      }`}
                     >
-                      S'inscrire
+                      {isEnrolled(c._id) ? 'Inscrit' : "S'inscrire"}
                     </button>
                   </div>
                 </div>

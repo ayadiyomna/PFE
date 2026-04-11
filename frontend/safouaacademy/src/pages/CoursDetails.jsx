@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useParams } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import axios from "axios";
+import coursService from "../services/coursService";
+import authService from "../services/authService";
+import api from "../services/api";
 
 function CourseDetail() {
   const navigate = useNavigate();
@@ -14,182 +15,136 @@ function CourseDetail() {
   const [reviews, setReviews] = useState([]);
   const [userReview, setUserReview] = useState({ rating: 5, comment: "" });
   const [submitting, setSubmitting] = useState(false);
-
-  const API_BASE = "http://localhost:5000/api";
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userData = authService.getCurrentUser();
+    setIsAuthenticated(!!token);
+    setUser(userData);
+    
     loadCourse();
     checkEnrollment();
     loadReviews();
+    loadProgress();
   }, [id]);
 
   const loadCourse = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const result = await coursService.getCoursById(id);
       
-      try {
-        const response = await axios.get(`${API_BASE}/cours/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setCourse(response.data);
-      } catch (apiError) {
-        console.log("API non disponible, chargement des données locales");
-        
-        // Chercher dans le localStorage
-        const courses = JSON.parse(localStorage.getItem('courses') || '[]');
-        const foundCourse = courses.find(c => c.id == id);
-        
-        if (foundCourse) {
-          setCourse(foundCourse);
-        } else {
-          toast.error("Cours non trouvé");
-          navigate('/cours');
-        }
+      if (result.success) {
+        setCourse(result.data);
+      } else {
+        navigate('/cours');
       }
     } catch (error) {
       console.error("Erreur chargement cours:", error);
-      toast.error("❌ Erreur lors du chargement du cours");
+      navigate('/cours');
     } finally {
       setLoading(false);
     }
   };
 
-  const checkEnrollment = () => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (user) {
-      const enrolledCourses = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-      setIsEnrolled(enrolledCourses.includes(parseInt(id)) || enrolledCourses.includes(id));
+  const checkEnrollment = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      const enrolled = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
+      setIsEnrolled(enrolled.includes(id) || enrolled.includes(parseInt(id)));
+    } catch (error) {
+      console.error("Erreur vérification inscription:", error);
     }
   };
 
   const loadReviews = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      try {
-        const response = await axios.get(`${API_BASE}/cours/${id}/avis`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setReviews(response.data);
-      } catch (apiError) {
-        // Charger les avis du localStorage
-        const localReviews = JSON.parse(localStorage.getItem(`reviews-${id}`) || '[]');
-        setReviews(localReviews);
-      }
+      const response = await api.get(`/cours/${id}/avis`);
+      setReviews(response.data.data || []);
     } catch (error) {
       console.error("Erreur chargement avis:", error);
     }
   };
 
+  const loadProgress = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      const response = await api.get(`/progress/cours/${id}`);
+      setProgress(response.data.data?.progress || 0);
+    } catch (error) {
+      console.error("Erreur chargement progression:", error);
+    }
+  };
+
   const handleEnroll = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user) {
-      toast.warning("🔐 Connectez-vous pour vous inscrire");
+    if (!isAuthenticated) {
       navigate('/login');
       return;
     }
 
     try {
-      toast.info("📝 Inscription en cours...");
-      const token = localStorage.getItem('token');
-      
-      try {
-        await axios.post(`${API_BASE}/cours/${id}/inscrire`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        // Mettre à jour localStorage
-        const enrolledCourses = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-        if (!enrolledCourses.includes(parseInt(id))) {
-          enrolledCourses.push(parseInt(id));
-          localStorage.setItem('enrolledCourses', JSON.stringify(enrolledCourses));
-        }
-        
+      const result = await coursService.enrollToCours(id);
+      if (result.success) {
         setIsEnrolled(true);
-        toast.success("✅ Inscription réussie !");
-      } catch (apiError) {
-        // Mode hors-ligne
-        const enrolledCourses = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-        if (!enrolledCourses.includes(parseInt(id))) {
-          enrolledCourses.push(parseInt(id));
-          localStorage.setItem('enrolledCourses', JSON.stringify(enrolledCourses));
-          setIsEnrolled(true);
-          toast.success("✅ Inscription réussie (mode hors-ligne)");
-        } else {
-          toast.info("📚 Vous êtes déjà inscrit à ce cours");
-        }
+        loadCourse(); // Recharger pour mettre à jour le nombre d'étudiants
       }
     } catch (error) {
-      toast.error("❌ Erreur lors de l'inscription");
+      console.error("Erreur lors de l'inscription:", error);
     }
   };
 
   const handleStartCourse = () => {
-    if (course.curriculum && course.curriculum.length > 0) {
-      navigate(`/cours/${id}/lecon/${course.curriculum[0].id}`);
+    if (course?.modules && course.modules.length > 0) {
+      const firstLessonId = course.modules[0]?.lecons?.[0]?._id;
+      if (firstLessonId) {
+        navigate(`/cours/${id}/lecon/${firstLessonId}`);
+      } else {
+        navigate(`/cours/${id}/lecon/1`);
+      }
     }
   };
 
-  const handleModuleClick = (moduleId) => {
+  const handleModuleClick = (moduleIndex, lessonIndex) => {
     if (isEnrolled) {
-      navigate(`/cours/${id}/lecon/${moduleId}`);
-    } else {
-      toast.warning("🔒 Vous devez être inscrit pour accéder aux leçons");
+      const lessonId = course?.modules[moduleIndex]?.lecons?.[lessonIndex]?._id;
+      if (lessonId) {
+        navigate(`/cours/${id}/lecon/${lessonId}`);
+      }
     }
   };
 
   const handleTakeQuiz = () => {
     if (isEnrolled) {
       navigate(`/quiz/cours/${id}`);
-    } else {
-      toast.warning("🔒 Inscrivez-vous d'abord pour accéder aux quiz");
     }
   };
 
   const handleSubmitReview = async () => {
-    if (!isEnrolled) {
-      toast.warning("🔒 Vous devez être inscrit pour laisser un avis");
+    if (!isAuthenticated) {
+      navigate('/login');
       return;
     }
 
     if (!userReview.comment.trim()) {
-      toast.error("Veuillez écrire un commentaire");
       return;
     }
 
     setSubmitting(true);
     
     try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user'));
+      await api.post(`/cours/${id}/avis`, {
+        note: userReview.rating,
+        commentaire: userReview.comment
+      });
       
-      const reviewData = {
-        id: Date.now(),
-        userId: user?.id,
-        userName: user?.name || "Utilisateur",
-        rating: userReview.rating,
-        comment: userReview.comment,
-        date: new Date().toISOString().split('T')[0]
-      };
-
-      try {
-        await axios.post(`${API_BASE}/cours/${id}/avis`, reviewData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } catch (apiError) {
-        // Mode hors-ligne
-        const allReviews = JSON.parse(localStorage.getItem(`reviews-${id}`) || '[]');
-        allReviews.push(reviewData);
-        localStorage.setItem(`reviews-${id}`, JSON.stringify(allReviews));
-      }
-
-      toast.success("✅ Avis publié avec succès !");
       setUserReview({ rating: 5, comment: "" });
-      loadReviews(); // Recharger les avis
-      
+      loadReviews();
     } catch (error) {
-      toast.error("❌ Erreur lors de la publication");
+      console.error("Erreur lors de la publication:", error);
     } finally {
       setSubmitting(false);
     }
@@ -219,19 +174,6 @@ function CourseDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToastContainer
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
-
       <header className="bg-white shadow-md border-t-4 border-emerald-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -248,15 +190,13 @@ function CourseDetail() {
           </div>
           <nav className="hidden md:flex space-x-8">
             <Link to="/cours" className="text-gray-600 hover:text-emerald-600">Catalogue</Link>
-            {!localStorage.getItem('token') ? (
+            {!isAuthenticated ? (
               <Link to="/login" className="text-gray-600 hover:text-emerald-600">Connexion</Link>
             ) : (
               <button
                 onClick={() => {
-                  localStorage.removeItem('token');
-                  localStorage.removeItem('user');
+                  authService.logout();
                   navigate('/');
-                  toast.success("👋 Déconnexion réussie");
                 }}
                 className="text-red-600 hover:text-red-700"
               >
@@ -264,17 +204,25 @@ function CourseDetail() {
               </button>
             )}
           </nav>
-          <Link 
-            to="/login"
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
-          >
-            Mon compte
-          </Link>
+          {isAuthenticated ? (
+            <button
+              onClick={() => navigate('/etudiant')}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
+            >
+              Mon compte
+            </button>
+          ) : (
+            <Link 
+              to="/login"
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
+            >
+              Se connecter
+            </Link>
+          )}
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Carte principale */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
           <div className="relative h-64 bg-emerald-100">
             <img 
@@ -286,7 +234,7 @@ function CourseDetail() {
               <span className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-full font-semibold">
                 {course.niveau}
               </span>
-              {course.certificate && (
+              {course.certificat && (
                 <span className="bg-amber-500 text-white text-sm px-4 py-2 rounded-full font-semibold">
                   🏆 Certifiant
                 </span>
@@ -298,12 +246,12 @@ function CourseDetail() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{course.titre}</h1>
-                <p className="text-gray-600">Par {course.instructor}</p>
+                <p className="text-gray-600">Par {course.instructeur?.prenom} {course.instructeur?.nom}</p>
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-yellow-400 text-2xl">★</span>
                 <span className="text-2xl font-bold text-gray-900">{course.rating || 4.5}</span>
-                <span className="text-gray-500">({course.reviews || 0} avis)</span>
+                <span className="text-gray-500">({course.nombreAvis || 0} avis)</span>
               </div>
             </div>
 
@@ -314,28 +262,28 @@ function CourseDetail() {
                 <span className="text-2xl">⏱️</span>
                 <div>
                   <p className="text-sm text-gray-500">Durée</p>
-                  <p className="font-semibold text-gray-900">{course.duration}</p>
+                  <p className="font-semibold text-gray-900">{Math.floor(course.dureeTotale / 60)}h {course.dureeTotale % 60}min</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
                 <span className="text-2xl">👥</span>
                 <div>
                   <p className="text-sm text-gray-500">Étudiants</p>
-                  <p className="font-semibold text-gray-900">{course.students || 0}</p>
+                  <p className="font-semibold text-gray-900">{course.students?.length || 0}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
                 <span className="text-2xl">📚</span>
                 <div>
                   <p className="text-sm text-gray-500">Modules</p>
-                  <p className="font-semibold text-gray-900">{course.curriculum?.length || 0}</p>
+                  <p className="font-semibold text-gray-900">{course.modules?.length || 0}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
                 <span className="text-2xl">🌐</span>
                 <div>
                   <p className="text-sm text-gray-500">Langue</p>
-                  <p className="font-semibold text-gray-900">{course.language || "Français"}</p>
+                  <p className="font-semibold text-gray-900">{course.langue || "Français"}</p>
                 </div>
               </div>
             </div>
@@ -352,7 +300,7 @@ function CourseDetail() {
                       onClick={handleStartCourse}
                       className="bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold text-lg"
                     >
-                      Continuer le cours
+                      {progress > 0 ? `Continuer (${progress}%)` : "Commencer le cours"}
                     </button>
                     <button
                       onClick={handleTakeQuiz}
@@ -374,7 +322,6 @@ function CourseDetail() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex items-center gap-2 mb-4 border-b border-gray-200">
           <button
             onClick={() => setActiveTab("apercu")}
@@ -408,15 +355,13 @@ function CourseDetail() {
           </button>
         </div>
 
-        {/* Contenu des tabs */}
         {activeTab === "apercu" && (
           <div className="space-y-6">
-            {/* Objectifs */}
-            {course.objectives && course.objectives.length > 0 && (
+            {course.objectifs && course.objectifs.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Objectifs d'apprentissage</h2>
                 <ul className="space-y-2">
-                  {course.objectives.map((objective, index) => (
+                  {course.objectifs.map((objective, index) => (
                     <li key={index} className="flex items-start gap-2">
                       <span className="text-emerald-600 text-lg">✓</span>
                       <span className="text-gray-700">{objective}</span>
@@ -426,12 +371,11 @@ function CourseDetail() {
               </div>
             )}
 
-            {/* Prérequis */}
-            {course.prerequisites && course.prerequisites.length > 0 && (
+            {course.prerequis && course.prerequis.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Prérequis</h2>
                 <ul className="space-y-2">
-                  {course.prerequisites.map((prerequisite, index) => (
+                  {course.prerequis.map((prerequisite, index) => (
                     <li key={index} className="flex items-start gap-2">
                       <span className="text-emerald-600 text-lg">📋</span>
                       <span className="text-gray-700">{prerequisite}</span>
@@ -441,25 +385,26 @@ function CourseDetail() {
               </div>
             )}
 
-            {/* Informations complémentaires */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Informations complémentaires</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Dernière mise à jour</p>
-                  <p className="font-semibold text-gray-900">{course.lastUpdated || "2026-01-15"}</p>
+                  <p className="font-semibold text-gray-900">
+                    {course.updatedAt ? new Date(course.updatedAt).toLocaleDateString('fr-FR') : "2026-01-15"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Certificat</p>
-                  <p className="font-semibold text-gray-900">{course.certificate ? "Oui" : "Non"}</p>
+                  <p className="font-semibold text-gray-900">{course.certificat ? "Oui" : "Non"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Catégorie</p>
-                  <p className="font-semibold text-gray-900">{course.category}</p>
+                  <p className="font-semibold text-gray-900">{course.categorie}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Langue</p>
-                  <p className="font-semibold text-gray-900">{course.language}</p>
+                  <p className="font-semibold text-gray-900">{course.langue || "Français"}</p>
                 </div>
               </div>
             </div>
@@ -469,35 +414,50 @@ function CourseDetail() {
         {activeTab === "programme" && (
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Programme du cours</h2>
-            {course.curriculum && course.curriculum.length > 0 ? (
+            {course.modules && course.modules.length > 0 ? (
               <div className="space-y-3">
-                {course.curriculum.map((module, index) => (
+                {course.modules.map((module, moduleIndex) => (
                   <div 
-                    key={module.id || index} 
+                    key={moduleIndex} 
                     className={`border border-gray-200 rounded-lg p-4 transition ${
                       isEnrolled ? 'hover:shadow-md cursor-pointer' : 'opacity-75'
                     }`}
-                    onClick={() => handleModuleClick(module.id)}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-                          {index + 1}
+                          {moduleIndex + 1}
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">{module.title}</h3>
+                          <h3 className="font-semibold text-gray-900">{module.titre}</h3>
                           <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                            <span>{module.lessons} leçons</span>
-                            <span>{module.duration}</span>
+                            <span>{module.lecons?.length || 0} leçons</span>
+                            <span>{module.duree || 0} min</span>
                           </div>
                         </div>
                       </div>
-                      {isEnrolled ? (
+                      {isEnrolled && (
                         <span className="text-emerald-600">▶</span>
-                      ) : (
-                        <span className="text-xs text-gray-400">🔒</span>
                       )}
                     </div>
+                    
+                    {module.lecons && module.lecons.length > 0 && (
+                      <div className="ml-14 space-y-2 mt-2">
+                        {module.lecons.map((lecon, lessonIndex) => (
+                          <div 
+                            key={lessonIndex}
+                            onClick={() => handleModuleClick(moduleIndex, lessonIndex)}
+                            className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-sm">📖</span>
+                              <span className="text-sm text-gray-700">{lecon.titre}</span>
+                            </div>
+                            <span className="text-xs text-gray-500">{lecon.duree || 0} min</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -514,7 +474,6 @@ function CourseDetail() {
 
         {activeTab === "avis" && (
           <div className="space-y-6">
-            {/* Formulaire d'avis */}
             {isEnrolled && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Donnez votre avis</h2>
@@ -562,25 +521,28 @@ function CourseDetail() {
               </div>
             )}
 
-            {/* Liste des avis */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Avis des étudiants</h2>
               {reviews.length > 0 ? (
                 <div className="space-y-4">
                   {reviews.map((review) => (
-                    <div key={review.id} className="border-b border-gray-100 pb-4 last:border-0">
+                    <div key={review._id} className="border-b border-gray-100 pb-4 last:border-0">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-900">{review.userName || review.user}</span>
+                          <span className="font-semibold text-gray-900">
+                            {review.utilisateur?.prenom} {review.utilisateur?.nom}
+                          </span>
                           <div className="flex items-center gap-1">
                             {[...Array(5)].map((_, i) => (
-                              <span key={i} className={i < review.rating ? 'text-yellow-400' : 'text-gray-300'}>★</span>
+                              <span key={i} className={i < review.note ? 'text-yellow-400' : 'text-gray-300'}>★</span>
                             ))}
                           </div>
                         </div>
-                        <span className="text-sm text-gray-500">{review.date}</span>
+                        <span className="text-sm text-gray-500">
+                          {new Date(review.date).toLocaleDateString('fr-FR')}
+                        </span>
                       </div>
-                      <p className="text-gray-700">{review.comment}</p>
+                      <p className="text-gray-700">{review.commentaire}</p>
                     </div>
                   ))}
                 </div>

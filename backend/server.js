@@ -10,6 +10,11 @@ dotenv.config();
 // Import des routes
 const userRoutes = require("./routes/userRoutes");
 const coursRoutes = require("./routes/cours");
+const statsRoutes = require('./routes/statsRoutes');
+const certificatRoutes = require('./routes/certificatRoutes');
+const quizRoutes = require('./routes/quizRoutes');
+const progressRoutes = require('./routes/progressRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -80,7 +85,11 @@ app.use((err, req, res, next) => {
     message: "Erreur interne du serveur"
   });
 });
-
+app.use("/api/stats", statsRoutes);
+app.use("/api/certificats", certificatRoutes);
+app.use("/api/quiz", quizRoutes);
+app.use("/api/progress", progressRoutes);
+app.use("/api/notifications", notificationRoutes);
 // Connexion à MongoDB
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = "mongodb://127.0.0.1:27017/safoua_academy";

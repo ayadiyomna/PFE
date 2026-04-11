@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import axios from "axios";
+import api from "../services/api";
+import authService from "../services/authService";
 
 function ProgressQuizPage() {
   const navigate = useNavigate();
@@ -28,9 +28,13 @@ function ProgressQuizPage() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [quizResult, setQuizResult] = useState(null);
 
-  const API_BASE = "http://localhost:5000/api";
-
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    
     loadProgressData();
     loadQuizHistory();
     loadAvailableQuizzes();
@@ -39,47 +43,10 @@ function ProgressQuizPage() {
   const loadProgressData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user'));
-      
-      try {
-        const response = await axios.get(`${API_BASE}/etudiant/progression`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setProgressData(response.data);
-      } catch (apiError) {
-        console.log("API non disponible, calcul depuis localStorage");
-        
-        const enrolledIds = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-        const lessonsProgress = JSON.parse(localStorage.getItem('lesson-progress') || '{}');
-        const quizResults = JSON.parse(localStorage.getItem('quizResults') || '[]');
-        
-        const completedLessons = Object.values(lessonsProgress).filter(v => v === true).length;
-        
-        const avgScore = quizResults.length > 0
-          ? Math.round(quizResults.reduce((acc, q) => acc + q.score, 0) / quizResults.length)
-          : 0;
-
-        setProgressData({
-          overall: Math.round((completedLessons / 30) * 100) || 64,
-          completedLessons: completedLessons || 13,
-          totalLessons: 29,
-          timeSpent: "8h 30min",
-          successfulQuizzes: quizResults.filter(q => q.score >= 70).length || 2,
-          averageScore: avgScore || 87,
-          streak: 5,
-          lastActive: "2026-03-15",
-          modules: [
-            { id: 1, name: "Introduction au Tajwid", progress: 100, completed: true, lessons: 5, completedLessons: 5 },
-            { id: 2, name: "Les règles de prononciation", progress: 75, completed: false, lessons: 8, completedLessons: 6 },
-            { id: 3, name: "Les pauses et arrêts", progress: 0, completed: false, lessons: 6, completedLessons: 0 },
-            { id: 4, name: "Pratique avancée", progress: 0, completed: false, lessons: 10, completedLessons: 0 }
-          ]
-        });
-      }
+      const response = await api.get('/progress/etudiant');
+      setProgressData(response.data.data);
     } catch (error) {
       console.error("Erreur chargement progression:", error);
-      toast.error("❌ Erreur lors du chargement de la progression");
     } finally {
       setLoading(false);
     }
@@ -87,56 +54,8 @@ function ProgressQuizPage() {
 
   const loadQuizHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      try {
-        const response = await axios.get(`${API_BASE}/etudiant/quiz/historique`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setQuizData(response.data);
-      } catch (apiError) {
-        const mockQuizData = [
-          { 
-            id: 1, 
-            title: "Quiz : Introduction au Tajwid", 
-            module: "Introduction au Tajwid",
-            date: "15/03/2026", 
-            score: 90, 
-            totalQuestions: 10,
-            correctAnswers: 9,
-            passed: true,
-            time: "12min",
-            questions: [
-              { question: "Question 1", userAnswer: "A", correctAnswer: "A", correct: true },
-              { question: "Question 2", userAnswer: "B", correctAnswer: "B", correct: true },
-              { question: "Question 3", userAnswer: "C", correctAnswer: "A", correct: false }
-            ]
-          },
-          { 
-            id: 2, 
-            title: "Quiz : Règles de base", 
-            module: "Les règles de prononciation",
-            date: "12/03/2026", 
-            score: 75, 
-            totalQuestions: 8,
-            correctAnswers: 6,
-            passed: true,
-            time: "10min"
-          },
-          { 
-            id: 3, 
-            title: "Quiz : Prononciation avancée", 
-            module: "Les règles de prononciation",
-            date: "10/03/2026", 
-            score: 60, 
-            totalQuestions: 12,
-            correctAnswers: 7,
-            passed: false,
-            time: "15min"
-          }
-        ];
-        setQuizData(mockQuizData);
-      }
+      const response = await api.get('/quiz/historique');
+      setQuizData(response.data.data || []);
     } catch (error) {
       console.error("Erreur chargement historique quiz:", error);
     }
@@ -144,44 +63,8 @@ function ProgressQuizPage() {
 
   const loadAvailableQuizzes = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      try {
-        const response = await axios.get(`${API_BASE}/etudiant/quiz/disponibles`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setAvailableQuizzes(response.data);
-      } catch (apiError) {
-        setAvailableQuizzes([
-          { 
-            id: 5, 
-            title: "Quiz : Les pauses et arrêts", 
-            module: "Les pauses et arrêts", 
-            questions: 10, 
-            duration: "15min",
-            difficulty: "Intermédiaire",
-            points: 100
-          },
-          { 
-            id: 6, 
-            title: "Quiz : Pratique avancée", 
-            module: "Pratique avancée", 
-            questions: 15, 
-            duration: "20min",
-            difficulty: "Avancé",
-            points: 150
-          },
-          { 
-            id: 7, 
-            title: "Quiz : Révision générale", 
-            module: "Tous les modules", 
-            questions: 25, 
-            duration: "30min",
-            difficulty: "Expert",
-            points: 250
-          }
-        ]);
-      }
+      const response = await api.get('/quiz/disponibles');
+      setAvailableQuizzes(response.data.data || []);
     } catch (error) {
       console.error("Erreur chargement quiz disponibles:", error);
     }
@@ -202,40 +85,22 @@ function ProgressQuizPage() {
     }));
   };
 
-  const handleSubmitQuiz = () => {
-    const totalQuestions = selectedQuiz.questions || 10;
-    const correctCount = Math.floor(Math.random() * (totalQuestions - 5)) + 5;
-    const score = Math.round((correctCount / totalQuestions) * 100);
-    const passed = score >= 70;
+  const handleSubmitQuiz = async () => {
+    if (!selectedQuiz) return;
 
-    setQuizResult({
-      score,
-      correctCount,
-      totalQuestions,
-      passed,
-      answers: quizAnswers
-    });
-
-    const newResult = {
-      id: Date.now(),
-      title: selectedQuiz.title,
-      module: selectedQuiz.module,
-      date: new Date().toLocaleDateString('fr-FR'),
-      score,
-      totalQuestions,
-      correctCount,
-      passed,
-      time: selectedQuiz.duration
-    };
-
-    const updatedQuizData = [...quizData, newResult];
-    setQuizData(updatedQuizData);
-    localStorage.setItem('quizResults', JSON.stringify(updatedQuizData));
-
-    if (passed) {
-      toast.success(`🎉 Félicitations ! Score: ${score}%`);
-    } else {
-      toast.warning(`📝 Score: ${score}% - Vous pouvez réessayer`);
+    try {
+      const response = await api.post('/quiz/submit', {
+        quizId: selectedQuiz._id,
+        answers: Object.values(quizAnswers)
+      });
+      
+      setQuizResult(response.data.data);
+      
+      // Recharger les données
+      loadQuizHistory();
+      loadAvailableQuizzes();
+    } catch (error) {
+      console.error("Erreur soumission quiz:", error);
     }
   };
 
@@ -246,7 +111,7 @@ function ProgressQuizPage() {
   };
 
   const handleRetryQuiz = (quizId) => {
-    const quiz = availableQuizzes.find(q => q.id === quizId);
+    const quiz = availableQuizzes.find(q => q._id === quizId);
     if (quiz) {
       handleStartQuiz(quiz);
     }
@@ -261,20 +126,6 @@ function ProgressQuizPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* CORRECTION: Ajout des valeurs booléennes explicites */}
-      <ToastContainer
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop={true}
-        closeOnClick={true}
-        rtl={false}
-        pauseOnFocusLoss={true}
-        draggable={true}
-        pauseOnHover={true}
-        theme="colored"
-      />
-
       {/* Modal Quiz */}
       {showQuizModal && selectedQuiz && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -297,10 +148,10 @@ function ProgressQuizPage() {
                       Question {currentQuestion + 1} sur {selectedQuiz.questions}
                     </p>
                     <p className="text-lg font-semibold mt-2">
-                      Question exemple {currentQuestion + 1}
+                      {selectedQuiz.questionsList?.[currentQuestion]?.question || `Question ${currentQuestion + 1}`}
                     </p>
                     <div className="mt-4 space-y-2">
-                      {['A', 'B', 'C', 'D'].map((option, index) => (
+                      {selectedQuiz.questionsList?.[currentQuestion]?.options?.map((option, index) => (
                         <label
                           key={index}
                           className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${
@@ -322,9 +173,9 @@ function ProgressQuizPage() {
                               ? 'border-emerald-600 bg-emerald-600 text-white'
                               : 'border-gray-300'
                           }`}>
-                            {option}
+                            {String.fromCharCode(65 + index)}
                           </span>
-                          <span>Option de réponse {option}</span>
+                          <span>{option}</span>
                         </label>
                       ))}
                     </div>
@@ -343,7 +194,7 @@ function ProgressQuizPage() {
                       ← Précédent
                     </button>
                     
-                    {currentQuestion === selectedQuiz.questions - 1 ? (
+                    {currentQuestion === (selectedQuiz.questions - 1) ? (
                       <button
                         onClick={handleSubmitQuiz}
                         className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
@@ -399,14 +250,14 @@ function ProgressQuizPage() {
           </Link>
           
           <nav className="hidden md:flex space-x-8">
-            <Link to="/catalogue" className="text-gray-600 hover:text-emerald-600">Catalogue</Link>
+            <Link to="/cours" className="text-gray-600 hover:text-emerald-600">Catalogue</Link>
             <Link to="/etudiant" className="text-gray-600 hover:text-emerald-600">Mes cours</Link>
             <Link to="/progression" className="text-emerald-600 font-semibold">Progression</Link>
             <Link to="/certificats" className="text-gray-600 hover:text-emerald-600">Certificats</Link>
           </nav>
           
           <button 
-            onClick={() => navigate('/compte')}
+            onClick={() => navigate('/etudiant')}
             className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
           >
             Mon compte
@@ -447,7 +298,6 @@ function ProgressQuizPage() {
           <>
             {activeTab === "progression" ? (
               <div className="space-y-6">
-                {/* Progression globale */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h1 className="text-2xl font-bold text-gray-900 mb-6">Progression globale</h1>
                   
@@ -490,7 +340,6 @@ function ProgressQuizPage() {
                     </div>
                   </div>
 
-                  {/* Streak */}
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -505,12 +354,11 @@ function ProgressQuizPage() {
                   </div>
                 </div>
 
-                {/* Progression par module */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Progression par module</h2>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Progression par cours</h2>
                   <div className="space-y-4">
-                    {progressData.modules.map((module) => (
-                      <div key={module.id} className="border border-gray-200 rounded-lg p-4">
+                    {progressData.modules.map((module, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
                             {module.completed && <span className="text-emerald-600">✓</span>}
@@ -532,12 +380,14 @@ function ProgressQuizPage() {
                         </div>
                       </div>
                     ))}
+                    {progressData.modules.length === 0 && (
+                      <p className="text-gray-500 text-center py-4">Aucun cours commencé</p>
+                    )}
                   </div>
                 </div>
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Historique des quiz */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Historique des quiz</h2>
                   {quizData.length > 0 ? (
@@ -591,12 +441,11 @@ function ProgressQuizPage() {
                   )}
                 </div>
 
-                {/* Quiz disponibles */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Quiz disponibles</h2>
                   <div className="space-y-3">
                     {availableQuizzes.map((quiz) => (
-                      <div key={quiz.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition bg-emerald-50/30">
+                      <div key={quiz._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition bg-emerald-50/30">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
                             <h3 className="font-semibold text-gray-900 mb-1">{quiz.title}</h3>
@@ -623,10 +472,12 @@ function ProgressQuizPage() {
                         </div>
                       </div>
                     ))}
+                    {availableQuizzes.length === 0 && (
+                      <p className="text-gray-500 text-center py-4">Aucun quiz disponible pour le moment</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Statistiques détaillées */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Statistiques détaillées</h2>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -658,33 +509,6 @@ function ProgressQuizPage() {
                       <p className="text-sm text-gray-600">Temps total</p>
                     </div>
                   </div>
-
-                  {quizData.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="font-semibold text-gray-900 mb-3">Performance par module</h3>
-                      <div className="space-y-2">
-                        {['Introduction au Tajwid', 'Les règles de prononciation'].map((module, idx) => {
-                          const moduleQuizzes = quizData.filter(q => q.module === module);
-                          const avgScore = moduleQuizzes.length > 0
-                            ? Math.round(moduleQuizzes.reduce((acc, q) => acc + q.score, 0) / moduleQuizzes.length)
-                            : 0;
-                          
-                          return (
-                            <div key={idx} className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600 w-48">{module}</span>
-                              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full ${avgScore >= 70 ? 'bg-emerald-600' : 'bg-amber-600'}`}
-                                  style={{ width: `${avgScore}%` }}
-                                ></div>
-                              </div>
-                              <span className="text-sm font-semibold text-gray-700 w-12">{avgScore}%</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}

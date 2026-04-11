@@ -1,23 +1,20 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import authService from "../services/authService";
 
 function Login() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    role: "etudiant",
   });
-
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
   const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (error) setError("");
   };
 
   const handleSubmit = async (e) => {
@@ -26,61 +23,56 @@ function Login() {
     setLoading(true);
 
     try {
-      setTimeout(() => {
-        if (formData.email && formData.password) {
-          const user = {
-            id: 1,
-            nom: "Utilisateur",
-            email: formData.email,
-            role: formData.role
-          };
-          
-          localStorage.setItem("token", "fake-jwt-token");
-          localStorage.setItem("user", JSON.stringify(user));
-
-          toast.success("Connexion réussie !");
-
-          switch(formData.role) {
-            case "administrateur":
-              navigate("/admin");
-              break;
-            case "enseignant":
-              navigate("/enseignant");
-              break;
-            default:
-              navigate("/etudiant");
-          }
-        } else {
-          toast.error("Email ou mot de passe incorrect");
-          setError("Email ou mot de passe incorrect");
+      const result = await authService.login(formData);
+      
+      if (result.success) {
+        const user = authService.getCurrentUser();
+        let role = user?.role;
+        
+        console.log("✅ Connexion réussie - Rôle reçu:", role);
+        
+        // Normaliser le rôle : 'administrateur' devient 'admin'
+        let normalizedRole = role;
+        if (role === 'administrateur') {
+          normalizedRole = 'admin';
+          // Mettre à jour le rôle dans localStorage
+          user.role = 'admin';
+          localStorage.setItem('user', JSON.stringify(user));
+          localStorage.setItem('role', 'admin');
+          console.log("🔄 Rôle normalisé en: admin");
         }
-        setLoading(false);
-      }, 1000);
+        
+        // Redirection en fonction du rôle normalisé
+        if (normalizedRole === 'admin') {
+          console.log("🚀 Redirection vers /admin");
+          window.location.href = '/admin';
+        } 
+        else if (normalizedRole === 'enseignant') {
+          console.log("🚀 Redirection vers /enseignant");
+          window.location.href = '/enseignant';
+        } 
+        else if (normalizedRole === 'etudiant') {
+          console.log("🚀 Redirection vers /etudiant");
+          window.location.href = '/etudiant';
+        }
+        else {
+          console.log("⚠️ Rôle inconnu, redirection vers /");
+          window.location.href = '/';
+        }
+      } else {
+        setError(result.message || "Email ou mot de passe incorrect");
+      }
     } catch (error) {
-      toast.error("Erreur de connexion");
-      setError("Erreur de connexion");
+      console.error("❌ Erreur de connexion:", error);
+      setError("Erreur de connexion au serveur");
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
-      {/* CORRECTION: Ajout des valeurs booléennes explicites */}
-      <ToastContainer 
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop={true}
-        closeOnClick={true}
-        rtl={false}
-        pauseOnFocusLoss={true}
-        draggable={true}
-        pauseOnHover={true}
-        theme="colored"
-      />
-
       <div className="max-w-5xl w-full rounded-3xl overflow-hidden shadow-2xl border border-gray-100 bg-white grid md:grid-cols-2">
-
         {/* LEFT SIDE */}
         <div className="relative p-10 text-white bg-gradient-to-br from-emerald-600 via-teal-600 to-sky-600">
           <h2 className="text-4xl font-extrabold">BIENVENUE</h2>
@@ -98,26 +90,32 @@ function Login() {
               Support: support@safoua.com
             </p>
           </div>
+
+          <div className="absolute bottom-8 left-8 right-8">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+              <p className="text-sm italic">
+                "Une plateforme exceptionnelle pour apprendre le Coran et la langue arabe"
+              </p>
+              <p className="text-xs mt-2 text-white/80">— Ahmed, étudiant</p>
+            </div>
+          </div>
         </div>
 
         {/* RIGHT SIDE */}
         <div className="p-10">
-          <h3 className="text-2xl font-bold text-gray-900">
-            Connexion
-          </h3>
+          <h3 className="text-2xl font-bold text-gray-900">Connexion</h3>
           <p className="text-gray-600 mb-6">Safoua Academy</p>
 
           {error && (
-            <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-4">
-              ⚠️ {error}
+            <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-
-            {/* EMAIL */}
             <div>
-              <label className="text-sm font-semibold">Email</label>
+              <label className="text-sm font-semibold text-gray-700">Email</label>
               <div className="relative mt-2">
                 <span className="absolute left-4 top-3 text-gray-400">📧</span>
                 <input
@@ -125,31 +123,15 @@ function Login() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="etudiant@exemple.com"
+                  placeholder="exemple@academy.com"
                   required
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
               </div>
             </div>
 
-            {/* ROLE */}
             <div>
-              <label className="text-sm font-semibold">Rôle</label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="w-full mt-2 px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="etudiant">Étudiant</option>
-                <option value="enseignant">Enseignant</option>
-                <option value="administrateur">Administrateur</option>
-              </select>
-            </div>
-
-            {/* PASSWORD */}
-            <div>
-              <label className="text-sm font-semibold">Mot de passe</label>
+              <label className="text-sm font-semibold text-gray-700">Mot de passe</label>
               <div className="relative mt-2">
                 <span className="absolute left-4 top-3 text-gray-400">🔒</span>
                 <input
@@ -159,33 +141,50 @@ function Login() {
                   onChange={handleChange}
                   placeholder="Votre mot de passe"
                   required
-                  className="w-full pl-11 pr-11 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-11 pr-11 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-3 text-gray-500"
+                  className="absolute right-4 top-3 text-gray-500 hover:text-gray-700 transition"
                 >
                   {showPassword ? "👁️" : "👁️‍🗨️"}
                 </button>
               </div>
             </div>
+            
+            <div className="flex justify-end mt-2">
+              <Link 
+                to="/forgot-password" 
+                className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline transition font-medium"
+              >
+                Mot de passe oublié ?
+              </Link>
+            </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-2xl font-semibold text-white shadow-lg bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
+              className="w-full py-4 rounded-2xl font-bold text-white shadow-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-lg"
             >
-              {loading ? "Connexion..." : "Se connecter"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Connexion...
+                </span>
+              ) : "Se connecter"}
             </button>
+            
+            <p className="text-center text-sm pt-5 border-t border-gray-200">
+              Pas de compte ?{" "}
+              <Link to="/register" className="text-emerald-600 font-semibold hover:text-emerald-700 transition">
+                S'inscrire
+              </Link>
+            </p>
           </form>
-
-          <p className="text-center text-sm mt-6">
-            Pas de compte ?{" "}
-            <Link to="/register" className="text-emerald-600 font-semibold">
-              S'inscrire
-            </Link>
-          </p>
         </div>
       </div>
     </section>

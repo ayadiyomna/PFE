@@ -38,30 +38,49 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  status: {
+    type: String,
+    enum: ["actif", "inactif", "en_attente", "suspendu"],
+    default: "actif"
+  },
   lastLogin: {
     type: Date
+  },
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpire: {
+    type: Date,
+    default: null
   }
 }, { 
   timestamps: true 
 });
 
 // Middleware pour hasher le mot de passe avant sauvegarde
-userSchema.pre('save', async function(next) {
-  // Ne hasher que si le mot de passe est modifié
-  if (!this.isModified('mdp')) return next();
+// Version utilisant une fonction normale (pas async)
+userSchema.pre('save', function(next) {
+  const user = this;
   
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.mdp = await bcrypt.hash(this.mdp, salt);
-    next();
-  } catch (error) {
-    next(error);
+  // Ne hasher que si le mot de passe est modifié
+  if (!user.isModified('mdp')) {
+    return next();
   }
+  
+  // Hasher le mot de passe avec bcrypt
+  bcrypt.hash(user.mdp, 10, (err, hash) => {
+    if (err) {
+      return next(err);
+    }
+    user.mdp = hash;
+    next();
+  });
 });
 
 // Méthode pour comparer les mots de passe
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.mdp);
+userSchema.methods.comparePassword = function(candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.mdp);
 };
 
 // Méthode pour retourner les infos publiques
@@ -72,6 +91,7 @@ userSchema.methods.getPublicProfile = function() {
     prenom: this.prenom,
     email: this.email,
     role: this.role,
+    status: this.status,
     image: this.image,
     createdAt: this.createdAt
   };

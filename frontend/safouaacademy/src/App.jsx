@@ -12,6 +12,8 @@ import Register from "./pages/Register";
 import Home from "./pages/Home";
 import Cours from "./pages/Cours";
 import CourseDetail from "./pages/CoursDetails";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 // Pages protégées
 import AdminDashboard from "./pages/AdminDashboard";
@@ -23,7 +25,7 @@ import CertificatesPage from "./pages/CertificatesPage";
 import CreerCours from './components/CreerCours';
 import ChatWidget from './components/ChatWidget';
 
-// Composant de route protégée (amélioré)
+// Composant de route protégée (amélioré pour accepter admin et administrateur)
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const [authState, setAuthState] = useState({
     isAuthenticated: false,
@@ -48,9 +50,15 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
         const user = JSON.parse(userStr);
         
+        // Normaliser le rôle pour la vérification
+        let normalizedRole = user?.role;
+        if (normalizedRole === 'administrateur') {
+          normalizedRole = 'admin';
+        }
+        
         setAuthState({
           isAuthenticated: true,
-          userRole: user?.role || null,
+          userRole: normalizedRole,
           loading: false
         });
       } catch (error) {
@@ -79,6 +87,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(authState.userRole)) {
+    console.log(`Rôle non autorisé: ${authState.userRole}, redirection vers home`);
     return <Navigate to="/" replace />;
   }
 
@@ -120,6 +129,30 @@ const NotFoundPage = () => (
 );
 
 function App() {
+  // Redirection automatique si admin connecté sur home
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    const currentPath = window.location.pathname;
+    
+    if (token && userStr && currentPath === '/') {
+      try {
+        const user = JSON.parse(userStr);
+        const role = user?.role;
+        
+        if (role === 'administrateur' || role === 'admin') {
+          window.location.href = '/admin';
+        } else if (role === 'enseignant') {
+          window.location.href = '/enseignant';
+        } else if (role === 'etudiant') {
+          window.location.href = '/etudiant';
+        }
+      } catch (error) {
+        console.error("Erreur de redirection:", error);
+      }
+    }
+  }, []);
+
   return (
     <>
       <BrowserRouter>
@@ -148,6 +181,10 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/cours" element={<Cours />} />
             <Route path="/cours/:id" element={<CourseDetail />} />
+            
+            {/* Routes de réinitialisation de mot de passe */}
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
             
             {/* Routes protégées - Étudiant */}
             <Route path="/etudiant" element={
@@ -223,7 +260,7 @@ function App() {
               </ProtectedRoute>
             } />
             
-            {/* Routes protégées - Admin */}
+            {/* Routes protégées - Admin (avec support des deux rôles) */}
             <Route path="/admin" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminDashboard />

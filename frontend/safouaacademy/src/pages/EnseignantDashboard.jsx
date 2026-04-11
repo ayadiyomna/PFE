@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import api from "../services/api";
 import coursService from "../services/coursService";
+import authService from "../services/authService";
 
 function EnseignantDashboard() {
   const navigate = useNavigate();
@@ -23,50 +23,38 @@ function EnseignantDashboard() {
   const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
-    try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
-      } else {
-        toast.warning("🔐 Veuillez vous connecter");
-        navigate('/login');
-      }
-    } catch (error) {
-      console.error("Erreur chargement utilisateur:", error);
+    const userData = authService.getCurrentUser();
+    if (userData) {
+      setUser(userData);
+    } else {
+      navigate('/login');
     }
   }, [navigate]);
 
   useEffect(() => {
     if (user) {
       loadTeacherData();
-      loadRecentActivities();
-      loadNotifications();
     }
   }, [user]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    toast.success("👋 Déconnexion réussie");
+    authService.logout();
     setTimeout(() => {
       navigate('/', { replace: true });
-    }, 1000);
+    }, 500);
   };
 
   const loadTeacherData = async () => {
     try {
       setLoading(true);
-      
-      // Charger les cours de l'enseignant
-      await loadTeacherCourses();
-      
-      // Charger les statistiques
-      await loadTeacherStats();
-      
+      await Promise.all([
+        loadTeacherCourses(),
+        loadTeacherStats(),
+        loadRecentActivities(),
+        loadNotifications()
+      ]);
     } catch (error) {
       console.error("Erreur chargement données:", error);
-      toast.error("❌ Erreur lors du chargement des données");
     } finally {
       setLoading(false);
     }
@@ -74,90 +62,38 @@ function EnseignantDashboard() {
 
   const loadTeacherCourses = async () => {
     try {
-      const result = await coursService.getTeacherCourses();
-      if (result.success) {
-        // Formater les données
-        const formattedCourses = result.data.map(course => ({
-          id: course.id,
-          title: course.titre || course.title,
-          status: course.status || "Brouillon",
-          statusColor: course.status === "Publié" ? "green" : 
-                      course.status === "Archivé" ? "gray" : "yellow",
-          students: course.students || 0,
-          progress: course.progress || 0,
-          lastUpdated: course.updatedAt ? new Date(course.updatedAt).toLocaleDateString('fr-FR') : 
-                      course.createdAt ? new Date(course.createdAt).toLocaleDateString('fr-FR') : 
-                      new Date().toLocaleDateString('fr-FR'),
-          lessons: course.lessons || course.curriculum?.length || 0,
-          price: course.prix || course.price || 0,
-          rating: course.rating || 0,
-          image: course.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=250&fit=crop"
-        }));
-        
-        setCourses(formattedCourses);
-        
-        // Sauvegarder en cache
-        localStorage.setItem('teacherCourses', JSON.stringify(formattedCourses));
-      }
+      const response = await api.get('/cours/enseignant/mes-cours');
+      const coursesData = response.data.data || response.data;
+      setCourses(coursesData);
     } catch (error) {
       console.error("Erreur chargement cours enseignant:", error);
-      
-      // Utiliser le cache si disponible
-      const cached = JSON.parse(localStorage.getItem('teacherCourses') || '[]');
-      if (cached.length > 0) {
-        setCourses(cached);
-        toast.info("📚 Cours chargés depuis le cache");
-      }
     }
   };
 
   const loadTeacherStats = async () => {
     try {
-      const response = await api.get('/enseignant/statistiques');
-      setStats(response.data.data || response.data);
+      const response = await api.get('/stats/enseignant');
+      setStats(response.data.data);
     } catch (error) {
       console.error("Erreur chargement stats:", error);
-      
-      // Calculer les stats depuis les cours
-      const totalStudents = courses.reduce((acc, course) => acc + (course.students || 0), 0);
-      const avgProgress = courses.length > 0 
-        ? Math.round(courses.reduce((acc, course) => acc + (course.progress || 0), 0) / courses.length)
-        : 0;
-      const totalRevenue = courses.reduce((acc, course) => acc + ((course.students || 0) * (course.price || 0)), 0);
-      
-      setStats({
-        totalStudents: totalStudents || 0,
-        totalCourses: courses.length,
-        averageProgress: avgProgress,
-        revenue: totalRevenue,
-        pendingReviews: 2
-      });
     }
   };
 
   const loadRecentActivities = async () => {
     try {
-      const response = await api.get('/enseignant/activites');
-      setRecentActivities(response.data.data || response.data);
+      const response = await api.get('/stats/activites');
+      setRecentActivities(response.data.data || []);
     } catch (error) {
-      // Activités simulées
-      setRecentActivities([
-        { id: 1, type: 'student', message: 'Nouvel étudiant inscrit à "Tajwid Avancé"', time: 'il y a 10 min' },
-        { id: 2, type: 'review', message: 'Nouvel avis sur "Arabe Classique" (5★)', time: 'il y a 1h' },
-        { id: 3, type: 'quiz', message: 'Quiz complété dans "Tajwid Avancé"', time: 'il y a 2h' }
-      ]);
+      console.error("Erreur chargement activités:", error);
     }
   };
 
   const loadNotifications = async () => {
     try {
-      const response = await api.get('/enseignant/notifications');
-      setNotifications(response.data.data || response.data);
+      const response = await api.get('/notifications');
+      setNotifications(response.data.data || []);
     } catch (error) {
-      setNotifications([
-        { id: 1, message: '3 étudiants ont terminé leur cours', read: false },
-        { id: 2, message: 'Nouvelle question en attente de réponse', read: false }
-      ]);
+      console.error("Erreur chargement notifications:", error);
     }
   };
 
@@ -186,124 +122,70 @@ function EnseignantDashboard() {
 
     try {
       const result = await coursService.deleteCours(deleteModal);
-      
       if (result.success) {
-        toast.success(result.message);
-        setCourses(courses.filter(c => c.id !== deleteModal));
+        setCourses(courses.filter(c => c._id !== deleteModal));
         setDeleteModal(null);
-        loadTeacherStats(); // Recharger les stats
+        loadTeacherStats();
       }
-      
     } catch (error) {
       console.error("Erreur suppression:", error);
-      toast.error("❌ Erreur lors de la suppression");
     }
   };
 
   const handleDuplicateCourse = async (course) => {
     try {
-      toast.info("📋 Duplication en cours...");
-      
       const newCourse = {
-        ...course,
-        titre: `${course.title} (copie)`,
-        status: "Brouillon",
-        students: 0,
-        progress: 0
+        titre: `${course.titre} (copie)`,
+        description: course.description,
+        categorie: course.categorie,
+        niveau: course.niveau,
+        prix: course.prix,
+        modules: course.modules || [],
+        status: "Brouillon"
       };
 
-      delete newCourse.id;
-      delete newCourse._id;
-
-      const result = await coursService.createCours(newCourse);
-      
-      if (result.success) {
-        toast.success("✅ Cours dupliqué avec succès !");
-        loadTeacherCourses(); // Recharger
-      }
-      
+      await coursService.createCours(newCourse);
+      loadTeacherCourses();
     } catch (error) {
       console.error("Erreur duplication:", error);
-      toast.error("❌ Erreur lors de la duplication");
     }
   };
 
   const handlePublishCourse = async (courseId) => {
     try {
-      await api.patch(`/enseignant/cours/${courseId}/publier`);
-      toast.success("📢 Cours publié avec succès !");
-      
+      await api.patch(`/cours/${courseId}`, { status: "Publié" });
       setCourses(courses.map(c => 
-        c.id === courseId 
-          ? { ...c, status: "Publié", statusColor: "green" }
-          : c
+        c._id === courseId ? { ...c, status: "Publié" } : c
       ));
-      
     } catch (error) {
       console.error("Erreur publication:", error);
-      
-      if (error.offline) {
-        // Mode hors-ligne
-        setCourses(courses.map(c => 
-          c.id === courseId 
-            ? { ...c, status: "Publié", statusColor: "green" }
-            : c
-        ));
-        toast.success("📢 Cours publié en mode hors-ligne");
-      } else {
-        toast.error("❌ Erreur lors de la publication");
-      }
     }
   };
 
   const handleArchiveCourse = async (courseId) => {
     try {
-      await api.patch(`/enseignant/cours/${courseId}/archiver`);
-      toast.info("📦 Cours archivé");
-      
+      await api.patch(`/cours/${courseId}`, { status: "Archivé" });
       setCourses(courses.map(c => 
-        c.id === courseId 
-          ? { ...c, status: "Archivé", statusColor: "gray" }
-          : c
+        c._id === courseId ? { ...c, status: "Archivé" } : c
       ));
-      
     } catch (error) {
       console.error("Erreur archivage:", error);
-      
-      if (error.offline) {
-        setCourses(courses.map(c => 
-          c.id === courseId 
-            ? { ...c, status: "Archivé", statusColor: "gray" }
-            : c
-        ));
-        toast.info("📦 Cours archivé en mode hors-ligne");
-      } else {
-        toast.error("❌ Erreur lors de l'archivage");
-      }
     }
   };
 
-  const markNotificationAsRead = (notificationId) => {
-    setNotifications(notifications.map(n => 
-      n.id === notificationId ? { ...n, read: true } : n
-    ));
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      await api.patch(`/notifications/${notificationId}/read`);
+      setNotifications(notifications.map(n => 
+        n._id === notificationId ? { ...n, read: true } : n
+      ));
+    } catch (error) {
+      console.error("Erreur marquage notification:", error);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToastContainer
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop={true}
-        closeOnClick={true}
-        rtl={false}
-        pauseOnFocusLoss={true}
-        draggable={true}
-        pauseOnHover={true}
-        theme="colored"
-      />
-
       {/* Modal de confirmation suppression */}
       {deleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -371,7 +253,6 @@ function EnseignantDashboard() {
           </nav>
           
           <div className="flex items-center gap-3">
-            {/* Notifications */}
             <div className="relative">
               <button className="p-2 hover:bg-gray-100 rounded-lg relative">
                 <span className="text-xl">🔔</span>
@@ -411,7 +292,6 @@ function EnseignantDashboard() {
       {/* MAIN CONTENT */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* En-tête avec bienvenue */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
@@ -434,7 +314,6 @@ function EnseignantDashboard() {
           </button>
         </div>
         
-        {/* Stats rapides */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition">
             <p className="text-sm text-gray-500">Total étudiants</p>
@@ -464,7 +343,6 @@ function EnseignantDashboard() {
           </div>
         ) : (
           <>
-            {/* TAB MES COURS */}
             {activeTab === "cours" && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Mes cours</h2>
@@ -472,54 +350,54 @@ function EnseignantDashboard() {
                 {courses.length > 0 ? (
                   <div className="space-y-4">
                     {courses.map((course) => (
-                      <div key={course.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                      <div key={course._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <h3 
                                 className="font-semibold text-gray-900 cursor-pointer hover:text-emerald-600"
-                                onClick={() => handleViewCourse(course.id)}
+                                onClick={() => handleViewCourse(course._id)}
                               >
-                                {course.title}
+                                {course.titre}
                               </h3>
                               <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                course.statusColor === 'green' 
+                                course.status === 'Publié' 
                                   ? 'bg-green-100 text-green-700' 
-                                  : course.statusColor === 'yellow'
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-gray-100 text-gray-700'
+                                  : course.status === 'Archivé'
+                                  ? 'bg-gray-100 text-gray-700'
+                                  : 'bg-yellow-100 text-yellow-700'
                               }`}>
-                                {course.status}
+                                {course.status || 'Brouillon'}
                               </span>
                             </div>
                             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                               <span className="flex items-center gap-1">
-                                <span>👥</span> {course.students} étudiants
+                                <span>👥</span> {course.students?.length || 0} étudiants
                               </span>
                               <span className="flex items-center gap-1">
-                                <span>📊</span> Progression: {course.progress}%
+                                <span>📊</span> Progression: {course.progress || 0}%
                               </span>
                               <span className="flex items-center gap-1">
-                                <span>📅</span> Mis à jour: {course.lastUpdated}
+                                <span>📅</span> Mis à jour: {new Date(course.updatedAt || course.createdAt).toLocaleDateString('fr-FR')}
                               </span>
-                                                            <span className="flex items-center gap-1">
+                              <span className="flex items-center gap-1">
                                 <span>⭐</span> {course.rating || "Nouveau"}
                               </span>
                               <span className="flex items-center gap-1">
-                                <span>💰</span> {course.price} DT
+                                <span>💰</span> {course.prix} DT
                               </span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <button 
-                              onClick={() => handleViewStats(course.id)}
+                              onClick={() => handleViewStats(course._id)}
                               className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                               title="Statistiques"
                             >
                               📊
                             </button>
                             <button 
-                              onClick={() => handleEditCourse(course.id)}
+                              onClick={() => handleEditCourse(course._id)}
                               className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                               title="Modifier"
                             >
@@ -527,7 +405,7 @@ function EnseignantDashboard() {
                             </button>
                             {course.status === "Brouillon" && (
                               <button 
-                                onClick={() => handlePublishCourse(course.id)}
+                                onClick={() => handlePublishCourse(course._id)}
                                 className="p-2 border border-green-200 text-green-700 rounded-lg hover:bg-green-50 transition"
                                 title="Publier"
                               >
@@ -536,7 +414,7 @@ function EnseignantDashboard() {
                             )}
                             {course.status === "Publié" && (
                               <button 
-                                onClick={() => handleArchiveCourse(course.id)}
+                                onClick={() => handleArchiveCourse(course._id)}
                                 className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                                 title="Archiver"
                               >
@@ -551,7 +429,7 @@ function EnseignantDashboard() {
                               📋
                             </button>
                             <button 
-                              onClick={() => handleDeleteCourse(course.id)}
+                              onClick={() => handleDeleteCourse(course._id)}
                               className="p-2 border border-red-200 text-red-700 rounded-lg hover:bg-red-50 transition"
                               title="Supprimer"
                             >
@@ -563,7 +441,7 @@ function EnseignantDashboard() {
                           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div 
                               className="h-full bg-emerald-600 rounded-full transition-all" 
-                              style={{ width: `${course.progress}%` }}
+                              style={{ width: `${course.progress || 0}%` }}
                             ></div>
                           </div>
                         </div>
@@ -585,7 +463,6 @@ function EnseignantDashboard() {
               </div>
             )}
 
-            {/* TAB ANALYTIQUES */}
             {activeTab === "analytiques" && (
               <div className="space-y-6">
                 <div className="bg-white rounded-xl shadow-sm p-6">
@@ -597,18 +474,18 @@ function EnseignantDashboard() {
                       <div className="space-y-3">
                         {courses.length > 0 ? (
                           courses.map(course => (
-                            <div key={course.id} className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600 w-32 truncate" title={course.title}>
-                                {course.title}
+                            <div key={course._id} className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600 w-32 truncate" title={course.titre}>
+                                {course.titre}
                               </span>
                               <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                                 <div 
                                   className="h-full bg-emerald-600 transition-all" 
-                                  style={{ width: `${course.progress}%` }}
+                                  style={{ width: `${course.progress || 0}%` }}
                                 ></div>
                               </div>
                               <span className="text-sm font-semibold text-gray-700 min-w-[40px] text-right">
-                                {course.progress}%
+                                {course.progress || 0}%
                               </span>
                             </div>
                           ))
@@ -657,12 +534,14 @@ function EnseignantDashboard() {
                         <span className="text-gray-400 ml-auto">{activity.time}</span>
                       </div>
                     ))}
+                    {recentActivities.length === 0 && (
+                      <p className="text-gray-500 text-center py-4">Aucune activité récente</p>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB ÉTUDIANTS */}
             {activeTab === "etudiants" && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Mes étudiants</h2>
@@ -679,47 +558,49 @@ function EnseignantDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {courses.length > 0 ? (
-                        courses.flatMap(course => 
-                          Array(course.students || 3).fill(null).map((_, idx) => (
-                            <tr key={`${course.id}-${idx}`} className="hover:bg-gray-50">
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                                    <span className="text-sm font-semibold text-emerald-600">
-                                      {String.fromCharCode(65 + idx)}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <p className="font-medium text-gray-900">Étudiant {idx + 1}</p>
-                                    <p className="text-xs text-gray-500">etudiant{idx+1}@email.com</p>
-                                  </div>
+                      {courses.flatMap(course => 
+                        (course.students || []).map((student, idx) => (
+                          <tr key={`${course._id}-${student._id || idx}`} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                  <span className="text-sm font-semibold text-emerald-600">
+                                    {student.prenom?.[0] || student.nom?.[0] || String.fromCharCode(65 + idx)}
+                                  </span>
                                 </div>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{course.title}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div 
-                                      className="h-full bg-emerald-600" 
-                                      style={{ width: `${Math.floor(Math.random() * 100)}%` }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-sm text-gray-600">{Math.floor(Math.random() * 100)}%</span>
+                                <div>
+                                  <p className="font-medium text-gray-900">{student.prenom} {student.nom}</p>
+                                  <p className="text-xs text-gray-500">{student.email}</p>
                                 </div>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">
-                                {new Date(Date.now() - Math.random() * 86400000).toLocaleDateString('fr-FR')}
-                              </td>
-                              <td className="px-4 py-3">
-                                <button className="text-emerald-600 hover:text-emerald-700 text-sm font-semibold">
-                                  Voir
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )
-                      ) : (
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{course.titre}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-emerald-600" 
+                                    style={{ width: `${student.progress || Math.floor(Math.random() * 100)}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm text-gray-600">{student.progress || 0}%</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {student.lastActive ? new Date(student.lastActive).toLocaleDateString('fr-FR') : "N/A"}
+                            </td>
+                            <td className="px-4 py-3">
+                              <button 
+                                onClick={() => navigate(`/admin/etudiants/${student._id}`)}
+                                className="text-emerald-600 hover:text-emerald-700 text-sm font-semibold"
+                              >
+                                Voir
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                      {courses.flatMap(c => c.students || []).length === 0 && (
                         <tr>
                           <td colSpan="5" className="text-center py-8 text-gray-500">
                             Aucun étudiant inscrit pour le moment
@@ -732,7 +613,6 @@ function EnseignantDashboard() {
               </div>
             )}
 
-            {/* TAB PARAMÈTRES */}
             {activeTab === "parametres" && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-6">Paramètres du compte enseignant</h2>
@@ -806,8 +686,10 @@ function EnseignantDashboard() {
                     <h3 className="font-semibold text-gray-900 mb-3">Paiements</h3>
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <p className="text-sm text-gray-600 mb-2">Prochain versement estimé</p>
-                      <p className="text-2xl font-bold text-emerald-600">2,450 DT</p>
-                      <p className="text-xs text-gray-500 mt-1">Date: 30/03/2026</p>
+                      <p className="text-2xl font-bold text-emerald-600">{stats.revenue > 0 ? Math.round(stats.revenue * 0.7) : 2450} DT</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Date: {new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString('fr-FR', { year: 'numeric', month: 'numeric', day: 'numeric' })}
+                      </p>
                     </div>
                   </div>
 

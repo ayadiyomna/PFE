@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import axios from "axios";
+import api from "../services/api";
+import authService from "../services/authService";
 
 function CertificatesPage() {
   const navigate = useNavigate();
@@ -10,10 +10,17 @@ function CertificatesPage() {
   const [inProgressCourses, setInProgressCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shareModal, setShareModal] = useState(null);
-
-  const API_BASE = "http://localhost:5000/api";
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsAuthenticated(!!token);
+    
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    
     loadCertificates();
     loadInProgressCourses();
   }, []);
@@ -21,46 +28,10 @@ function CertificatesPage() {
   const loadCertificates = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      try {
-        const response = await axios.get(`${API_BASE}/certificats/mes-certificats`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setCertificates(response.data);
-        toast.success(`📜 ${response.data.length} certificats chargés`);
-      } catch (apiError) {
-        console.log("API non disponible, chargement des données locales");
-        // Données simulées
-        const mockCertificates = [
-          {
-            id: "SAF-2024-001",
-            course: "Tajwid Avancé",
-            level: "Expert",
-            date: "15 fév 2024",
-            instructor: "Cheikh Ahmed Al-Mansouri",
-            score: 94,
-            hours: 42,
-            image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop",
-            pdf: "/certificats/saf-2024-001.pdf"
-          },
-          {
-            id: "SAF-2024-002",
-            course: "Arabe Classique - Niveau 1",
-            level: "Débutant",
-            date: "10 jan 2024",
-            instructor: "Dr. Fatima Zahra",
-            score: 88,
-            hours: 36,
-            image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&h=400&fit=crop",
-            pdf: "/certificats/saf-2024-002.pdf"
-          }
-        ];
-        setCertificates(mockCertificates);
-      }
+      const response = await api.get('/certificats/mes-certificats');
+      setCertificates(response.data.data || []);
     } catch (error) {
       console.error("Erreur chargement certificats:", error);
-      toast.error("❌ Erreur lors du chargement des certificats");
     } finally {
       setLoading(false);
     }
@@ -68,39 +39,12 @@ function CertificatesPage() {
 
   const loadInProgressCourses = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const response = await api.get('/cours/etudiant/mes-cours');
+      const courses = response.data.data || [];
       
-      try {
-        const response = await axios.get(`${API_BASE}/cours/en-cours`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setInProgressCourses(response.data);
-      } catch (apiError) {
-        // Données simulées
-        setInProgressCourses([
-          {
-            id: 2,
-            title: "Arabe Classique",
-            progress: 64,
-            remainingLessons: 12,
-            estimatedCompletion: "avril 2026"
-          },
-          {
-            id: 3,
-            title: "Fiqh & Usul",
-            progress: 32,
-            remainingLessons: 24,
-            estimatedCompletion: "juin 2026"
-          },
-          {
-            id: 4,
-            title: "Tafsir du Coran",
-            progress: 18,
-            remainingLessons: 36,
-            estimatedCompletion: "août 2026"
-          }
-        ]);
-      }
+      // Filtrer les cours non terminés
+      const inProgress = courses.filter(c => (c.progress || 0) < 100);
+      setInProgressCourses(inProgress);
     } catch (error) {
       console.error("Erreur chargement cours en cours:", error);
     }
@@ -108,35 +52,20 @@ function CertificatesPage() {
 
   const handleDownloadCertificate = async (certificateId) => {
     try {
-      toast.info("📥 Préparation du téléchargement...");
+      const response = await api.get(`/certificats/${certificateId}/pdf`, {
+        responseType: 'blob'
+      });
       
-      const token = localStorage.getItem('token');
-      
-      try {
-        const response = await axios.get(`${API_BASE}/certificats/${certificateId}/pdf`, {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob'
-        });
-        
-        // Créer un lien de téléchargement
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `certificat-${certificateId}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        
-        toast.success("✅ Certificat téléchargé !");
-      } catch (apiError) {
-        // Simulation de téléchargement
-        setTimeout(() => {
-          toast.success("✅ Certificat téléchargé (mode développement)");
-          window.open(`/certificats/${certificateId}/pdf`, '_blank');
-        }, 1000);
-      }
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `certificat-${certificateId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error("❌ Erreur lors du téléchargement");
+      console.error("Erreur lors du téléchargement:", error);
     }
   };
 
@@ -145,23 +74,19 @@ function CertificatesPage() {
   };
 
   const handleShareConfirm = async (method, certificateId) => {
-    const shareUrl = `https://safouaacademy.com/certificats/${certificateId}`;
+    const shareUrl = `${window.location.origin}/certificats/${certificateId}`;
     
     try {
       if (method === 'copy') {
         await navigator.clipboard.writeText(shareUrl);
-        toast.success("📋 Lien copié dans le presse-papiers !");
       } else if (method === 'email') {
         window.location.href = `mailto:?subject=Mon certificat Safoua Academy&body=J'ai obtenu mon certificat ! Consultez-le ici : ${shareUrl}`;
-        toast.success("📧 Client email ouvert");
       } else if (method === 'linkedin') {
         window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank');
-        toast.success("🔗 Partage LinkedIn ouvert");
       }
-      
       setShareModal(null);
     } catch (error) {
-      toast.error("❌ Erreur lors du partage");
+      console.error("Erreur lors du partage:", error);
     }
   };
 
@@ -173,31 +98,17 @@ function CertificatesPage() {
     navigate(`/cours/${courseId}`);
   };
 
-  const handleGenerateCertificate = (courseId) => {
-    // Générer un nouveau certificat (après completion du cours)
-    toast.success("🎉 Félicitations ! Votre certificat est en cours de génération...");
-    setTimeout(() => {
+  const handleGenerateCertificate = async (courseId) => {
+    try {
+      await api.post(`/certificats/generer/${courseId}`);
       loadCertificates();
-      toast.success("📜 Nouveau certificat disponible !");
-    }, 2000);
+    } catch (error) {
+      console.error("Erreur génération certificat:", error);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToastContainer
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
-
-      {/* Header */}
       <header className="bg-white shadow-md border-t-4 border-emerald-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
@@ -205,8 +116,11 @@ function CertificatesPage() {
           </Link>
           
           <nav className="hidden md:flex space-x-8">
-            <Link to="/catalogue" className="text-gray-600 hover:text-emerald-600">
+            <Link to="/cours" className="text-gray-600 hover:text-emerald-600">
               Catalogue
+            </Link>
+            <Link to="/etudiant" className="text-gray-600 hover:text-emerald-600">
+              Mes cours
             </Link>
             <Link to="/progression" className="text-gray-600 hover:text-emerald-600">
               Progression
@@ -217,7 +131,7 @@ function CertificatesPage() {
           </nav>
           
           <button 
-            onClick={() => navigate('/compte')}
+            onClick={() => navigate('/etudiant')}
             className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
           >
             Mon compte
@@ -270,7 +184,6 @@ function CertificatesPage() {
         </div>
       )}
 
-      {/* Contenu principal */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {loading ? (
@@ -279,7 +192,6 @@ function CertificatesPage() {
           </div>
         ) : (
           <>
-            {/* En-tête avec statistiques */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
               <h1 className="text-3xl font-bold text-gray-900">Mes certificats</h1>
               
@@ -295,7 +207,6 @@ function CertificatesPage() {
               </div>
             </div>
 
-            {/* Section des certificats obtenus */}
             {certificates.length > 0 ? (
               <div className="space-y-6 mb-10">
                 <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
@@ -305,7 +216,6 @@ function CertificatesPage() {
                 
                 {certificates.map((cert) => (
                   <div key={cert.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition">
-                    {/* En-tête du certificat */}
                     <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-8 border-b-4 border-emerald-600">
                       <div className="text-center">
                         <span className="text-6xl mb-4 block">🏆</span>
@@ -327,7 +237,6 @@ function CertificatesPage() {
                       </div>
                     </div>
 
-                    {/* Actions */}
                     <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                       <div>
                         <p className="text-sm text-gray-600">Ce certificat atteste de votre réussite</p>
@@ -368,13 +277,12 @@ function CertificatesPage() {
                 ))}
               </div>
             ) : (
-              /* État vide */
               <div className="bg-white rounded-xl shadow-sm p-12 text-center mb-10">
                 <span className="text-6xl mb-4 block">🏆</span>
                 <h3 className="text-xl font-bold text-gray-700 mb-2">Aucun certificat pour le moment</h3>
                 <p className="text-gray-500 mb-4">Complétez vos cours pour obtenir vos premiers certificats</p>
                 <Link 
-                  to="/catalogue" 
+                  to="/cours" 
                   className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold"
                 >
                   <span>📚</span>
@@ -383,7 +291,6 @@ function CertificatesPage() {
               </div>
             )}
 
-            {/* Certificats à venir */}
             {inProgressCourses.length > 0 && (
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
@@ -393,36 +300,39 @@ function CertificatesPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {inProgressCourses.map((course) => (
-                    <div key={course.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition">
+                    <div key={course._id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition">
                       <div className="p-6">
                         <div className="flex items-center gap-3 mb-4">
                           <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
                             <span className="text-2xl">📖</span>
                           </div>
                           <div>
-                            <h3 className="font-bold text-gray-900">{course.title}</h3>
-                            <p className="text-xs text-gray-500">Est. {course.estimatedCompletion}</p>
+                            <h3 className="font-bold text-gray-900">{course.titre}</h3>
+                            <p className="text-xs text-gray-500">
+                              Est. {new Date(new Date().setMonth(new Date().getMonth() + 2)).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Barre de progression */}
                         <div className="mb-3">
                           <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-600">Progression</span>
-                            <span className="font-semibold text-emerald-600">{course.progress}%</span>
+                            <span className="font-semibold text-emerald-600">{course.progress || 0}%</span>
                           </div>
                           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div 
                               className="h-full bg-emerald-600 transition-all" 
-                              style={{ width: `${course.progress}%` }}
+                              style={{ width: `${course.progress || 0}%` }}
                             ></div>
                           </div>
                         </div>
 
                         <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-500">{course.remainingLessons} leçons restantes</span>
+                          <span className="text-gray-500">
+                            {course.remainingLessons || Math.floor((100 - (course.progress || 0)) / 10)} leçons restantes
+                          </span>
                           <button
-                            onClick={() => handleContinueCourse(course.id)}
+                            onClick={() => handleContinueCourse(course._id)}
                             className="text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
                           >
                             Continuer

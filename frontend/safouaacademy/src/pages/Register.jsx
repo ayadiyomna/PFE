@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import authService from "../services/authService";
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -26,71 +25,63 @@ function Register() {
     if (error) setError("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-
+  const validateForm = () => {
     if (formData.password !== formData.confirmPassword) {
       setError("Les mots de passe ne correspondent pas");
-      toast.error("❌ Les mots de passe ne correspondent pas");
-      return;
+      return false;
     }
     
     if (!formData.acceptTerms) {
       setError("Vous devez accepter les conditions d'utilisation");
-      toast.error("📝 Vous devez accepter les conditions d'utilisation");
-      return;
+      return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError("Email invalide");
-      toast.error("📧 Format d'email invalide");
-      return;
+      return false;
     }
 
     if (formData.password.length < 6) {
       setError("Le mot de passe doit contenir au moins 6 caractères");
-      toast.error("🔒 Le mot de passe doit contenir au moins 6 caractères");
-      return;
+      return false;
     }
+
+    if (!formData.nom.trim() || !formData.prenom.trim()) {
+      setError("Le nom et le prénom sont requis");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (!validateForm()) return;
 
     setLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await authService.register(formData);
       
-      const user = {
-        id: Date.now(),
-        nom: formData.nom,
-        prenom: formData.prenom,
-        email: formData.email,
-        role: formData.role,
-        name: `${formData.prenom} ${formData.nom}`
-      };
-      
-      localStorage.setItem("token", "fake-jwt-token-" + Date.now());
-      localStorage.setItem("user", JSON.stringify(user));
-      localStorage.setItem("role", formData.role);
-
-      toast.success("✅ Inscription réussie !");
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      switch(formData.role) {
-        case "administrateur":
-          navigate("/admin/dashboard");
-          break;
-        case "enseignant":
-          navigate("/enseignant/dashboard");
-          break;
-        default:
-          navigate("/etudiant");
+      if (result.success) {
+        const user = authService.getCurrentUser();
+        const role = user?.role;
+        
+        // Redirection en fonction du rôle
+        if (role === 'enseignant') {
+          navigate('/enseignant');
+        } else {
+          navigate('/etudiant');
+        }
+      } else {
+        setError(result.message || "Erreur lors de l'inscription");
       }
     } catch (error) {
       console.error("Erreur inscription:", error);
-      setError("Erreur lors de l'inscription");
-      toast.error("❌ Erreur lors de l'inscription");
+      setError("Erreur de connexion au serveur");
     } finally {
       setLoading(false);
     }
@@ -98,20 +89,6 @@ function Register() {
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
-      {/* CORRECTION: Ajout des valeurs booléennes explicites */}
-      <ToastContainer 
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop={true}
-        closeOnClick={true}
-        rtl={false}
-        pauseOnFocusLoss={true}
-        draggable={true}
-        pauseOnHover={true}
-        theme="colored"
-      />
-
       <div className="max-w-5xl w-full rounded-3xl overflow-hidden shadow-2xl border border-gray-100 bg-white grid md:grid-cols-2">
         {/* LEFT SIDE */}
         <div className="relative p-10 text-white bg-gradient-to-br from-emerald-600 via-teal-600 to-sky-600">
@@ -217,8 +194,10 @@ function Register() {
               >
                 <option value="etudiant">👨‍🎓 Étudiant</option>
                 <option value="enseignant">👨‍🏫 Enseignant</option>
-                <option value="administrateur">👨‍💼 Administrateur</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                * Les comptes enseignants doivent être approuvés par l'administrateur
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -278,7 +257,7 @@ function Register() {
                 className="w-5 h-5 mt-0.5 accent-emerald-600"
               />
               <span className="text-sm text-gray-600">
-                J'accepte les <a href="/conditions" className="text-emerald-600 hover:underline">conditions d'utilisation</a> et la <a href="/confidentialite" className="text-emerald-600 hover:underline">politique de confidentialité</a>
+                J'accepte les conditions d'utilisation et la politique de confidentialité
               </span>
             </label>
 
