@@ -20,14 +20,15 @@ function Cours() {
   const [categories, setCategories] = useState([]);
   const [levels, setLevels] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [enrolledCourses, setEnrolledCourses] = useState([]);
+  const [user, setUser] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     setIsAuthenticated(!!token);
     
-    const enrolled = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-    setEnrolledCourses(enrolled);
+    const userData = authService.getCurrentUser();
+    setUser(userData);
     
     loadCourses();
   }, []);
@@ -94,6 +95,9 @@ function Cours() {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
+    if (name === 'category') {
+      setSelectedCategory(value);
+    }
   };
 
   const resetFilters = () => {
@@ -104,6 +108,32 @@ function Cours() {
       priceMin: "",
       priceMax: ""
     });
+    setSelectedCategory('');
+  };
+
+  const handleCategoryClick = (cat) => {
+    const newCat = selectedCategory === cat ? '' : cat;
+    setSelectedCategory(newCat);
+    setFilters(prev => ({ ...prev, category: newCat }));
+  };
+
+  // Grouper les cours filtrés par catégorie
+  const coursesByCategory = filteredCourses.reduce((groups, course) => {
+    const cat = course.categorie || 'Autres';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(course);
+    return groups;
+  }, {});
+
+  // Emoji par catégorie
+  const categoryEmoji = {
+    'Coran': '📖',
+    'Langue Arabe': '🌍',
+    'Jurisprudence': '⚖️',
+    'Sciences Islamiques': '🕌',
+    'Hadith': '📜',
+    'Tajwid': '🎙️',
+    'Autres': '📚'
   };
 
   const handleViewCourse = (courseId) => {
@@ -121,7 +151,6 @@ function Cours() {
     try {
       const result = await coursService.enrollToCours(courseId);
       if (result.success) {
-        setEnrolledCourses(prev => [...prev, courseId]);
         loadCourses(); // Recharger pour mettre à jour le nombre d'étudiants
       }
     } catch (error) {
@@ -132,11 +161,17 @@ function Cours() {
   const handleLogout = () => {
     authService.logout();
     setIsAuthenticated(false);
+    setUser(null);
     navigate('/', { replace: true });
   };
 
-  const isEnrolled = (courseId) => {
-    return enrolledCourses.includes(courseId.toString()) || enrolledCourses.includes(courseId);
+  // Vérifier l'inscription depuis les données backend (course.students)
+  const isEnrolled = (course) => {
+    if (!user || !course.students) return false;
+    return course.students.some(s => {
+      const studentId = s._id ? s._id.toString() : s.toString();
+      return studentId === user._id?.toString() || studentId === user.id?.toString();
+    });
   };
 
   return (
@@ -263,6 +298,36 @@ function Cours() {
           </div>
         </div>
 
+        {/* Barre de catégories */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => handleCategoryClick('')}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+              selectedCategory === ''
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'bg-white text-gray-700 hover:bg-emerald-50 border border-gray-200'
+            }`}
+          >
+            📋 Toutes ({filteredCourses.length})
+          </button>
+          {categories.map(cat => {
+            const count = cours.filter(c => c.categorie === cat).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => handleCategoryClick(cat)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                  selectedCategory === cat
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-emerald-50 border border-gray-200'
+                }`}
+              >
+                {categoryEmoji[cat] || '📚'} {cat} ({count})
+              </button>
+            );
+          })}
+        </div>
+
         <p className="text-gray-600 mb-4">
           {filteredCourses.length} cours trouvés
         </p>
@@ -272,89 +337,103 @@ function Cours() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600"></div>
           </div>
         ) : filteredCourses.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCourses.map((c) => (
-              <div 
-                key={c._id} 
-                className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition cursor-pointer group"
-                onClick={() => handleViewCourse(c._id)}
-              >
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={c.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=200&fit=crop"}
-                    alt={c.titre}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute top-3 left-3">
-                    <span className="bg-emerald-600 text-white text-xs px-3 py-1 rounded-full font-semibold">
-                      {c.niveau}
-                    </span>
-                  </div>
-                  {c.prix === 0 && (
-                    <div className="absolute top-3 right-3">
-                      <span className="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
-                        Gratuit
-                      </span>
-                    </div>
-                  )}
-                  {isEnrolled(c._id) && (
-                    <div className="absolute bottom-3 right-3">
-                      <span className="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
-                        Inscrit ✓
-                      </span>
-                    </div>
-                  )}
+          <div className="space-y-8">
+            {Object.entries(coursesByCategory).map(([category, categoryCourses]) => (
+              <div key={category}>
+                {/* En-tête de catégorie */}
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-2xl">{categoryEmoji[category] || '📚'}</span>
+                  <h2 className="text-2xl font-bold text-gray-900">{category}</h2>
+                  <span className="bg-emerald-100 text-emerald-700 text-sm px-3 py-1 rounded-full font-semibold">
+                    {categoryCourses.length} cours
+                  </span>
                 </div>
 
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-xl font-bold text-gray-900 line-clamp-1">{c.titre}</h3>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <span className="text-yellow-400">★</span>
-                      <span className="font-semibold">{c.rating || 4.5}</span>
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-gray-600 mb-2 line-clamp-1">
-                    {c.instructeur?.prenom} {c.instructeur?.nom}
-                  </p>
-                  <p className="text-xs text-gray-500 mb-3">{c.categorie}</p>
-
-                  <p className="text-sm text-gray-500 mb-4 line-clamp-2">
-                    {c.description}
-                  </p>
-
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                    <div className="flex items-center gap-1">
-                      <span>👥</span>
-                      <span>{c.students?.length || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span>📚</span>
-                      <span>{c.modules?.length || 0} modules</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span>⏱️</span>
-                      <span>{c.dureeTotale || 0} min</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-emerald-600 font-bold text-xl">
-                      {c.prix === 0 ? "Gratuit" : `${c.prix} DT`}
-                    </span>
-                    <button
-                      onClick={(e) => handleEnrollCourse(c._id, e)}
-                      disabled={isEnrolled(c._id)}
-                      className={`px-4 py-2 rounded-lg transition font-semibold text-sm ${
-                        isEnrolled(c._id)
-                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      }`}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {categoryCourses.map((c) => (
+                    <div 
+                      key={c._id} 
+                      className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition cursor-pointer group"
+                      onClick={() => handleViewCourse(c._id)}
                     >
-                      {isEnrolled(c._id) ? 'Inscrit' : "S'inscrire"}
-                    </button>
-                  </div>
+                      <div className="relative h-48 overflow-hidden">
+                        <img
+                          src={c.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=200&fit=crop"}
+                          alt={c.titre}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                        <div className="absolute top-3 left-3">
+                          <span className="bg-emerald-600 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                            {c.niveau}
+                          </span>
+                        </div>
+                        {c.prix === 0 && (
+                          <div className="absolute top-3 right-3">
+                            <span className="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                              Gratuit
+                            </span>
+                          </div>
+                        )}
+                        {isEnrolled(c) && (
+                          <div className="absolute bottom-3 right-3">
+                            <span className="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                              Inscrit ✓
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-5">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="text-xl font-bold text-gray-900 line-clamp-1">{c.titre}</h3>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className="text-yellow-400">★</span>
+                            <span className="font-semibold">{c.rating || 4.5}</span>
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-gray-600 mb-2 line-clamp-1">
+                          {c.instructeur?.prenom} {c.instructeur?.nom}
+                        </p>
+
+                        <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+                          {c.description}
+                        </p>
+
+                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
+                          <div className="flex items-center gap-1">
+                            <span>👥</span>
+                            <span>{c.students?.length || 0}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span>📚</span>
+                            <span>{c.modules?.length || 0} modules</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span>⏱️</span>
+                            <span>{c.dureeTotale || 0} min</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-emerald-600 font-bold text-xl">
+                            {c.prix === 0 ? "Gratuit" : `${c.prix} DT`}
+                          </span>
+                          <button
+                            onClick={(e) => handleEnrollCourse(c._id, e)}
+                            disabled={isEnrolled(c)}
+                            className={`px-4 py-2 rounded-lg transition font-semibold text-sm ${
+                              isEnrolled(c)
+                                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                            }`}
+                          >
+                            {isEnrolled(c) ? 'Inscrit' : "S'inscrire"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
