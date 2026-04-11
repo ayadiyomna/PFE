@@ -332,13 +332,6 @@ class CoursService {
     try {
       const response = await api.post(`/cours/${coursId}/inscrire`);
       
-      // Mettre à jour localStorage
-      const enrolled = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-      if (!enrolled.includes(coursId.toString())) {
-        enrolled.push(coursId.toString());
-        localStorage.setItem('enrolledCourses', JSON.stringify(enrolled));
-      }
-      
       return {
         success: true,
         data: response.data,
@@ -346,21 +339,6 @@ class CoursService {
       };
     } catch (error) {
       console.error(`Erreur enrollToCours ${coursId}:`, error);
-      
-      if (error.isOffline) {
-        // Mode hors-ligne
-        const enrolled = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-        if (!enrolled.includes(coursId.toString())) {
-          enrolled.push(coursId.toString());
-          localStorage.setItem('enrolledCourses', JSON.stringify(enrolled));
-        }
-        
-        return {
-          success: true,
-          offline: true,
-          message: 'Inscription en mode hors-ligne'
-        };
-      }
       
       return {
         success: false,

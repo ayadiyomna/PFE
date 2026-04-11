@@ -127,6 +127,21 @@ class AuthService {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('role');
+    // Nettoyer toutes les données de session utilisateur
+    localStorage.removeItem('enrolledCourses');
+    localStorage.removeItem('courses');
+    localStorage.removeItem('offlineCourses');
+    localStorage.removeItem('wishlist');
+    localStorage.removeItem('registeredUsers');
+    // Nettoyer les données de progression locales
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('lesson-progress-') || key.startsWith('notes-') || key.startsWith('bookmarks-'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
   }
 
   /**
