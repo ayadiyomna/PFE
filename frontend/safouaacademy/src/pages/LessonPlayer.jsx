@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link, useParams } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import axios from "axios";
+import api from "../services/api";
 
 function LessonPlayer() {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ function LessonPlayer() {
   const [showBookmarkModal, setShowBookmarkModal] = useState(false);
   const [bookmarkNote, setBookmarkNote] = useState("");
 
-  const API_BASE = "http://localhost:5000/api";
+  // Utilisation du service api centralisé (pas besoin d'API_BASE)
 
   useEffect(() => {
     loadLessonData();
@@ -48,23 +48,46 @@ function LessonPlayer() {
   const loadLessonData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       
       try {
-        const courseResponse = await axios.get(`${API_BASE}/cours/${courseId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setCourse(courseResponse.data);
+        // Charger le cours depuis l'API centralisée
+        const courseResponse = await api.get(`/cours/${courseId}`);
+        const courseData = courseResponse.data.data || courseResponse.data;
+        setCourse(courseData);
         
-        const lessonResponse = await axios.get(`${API_BASE}/cours/${courseId}/lecons/${lessonId}`, {
-          headers: { Authorization: `Bearer ${token}` }
+        // Extraire les leçons depuis les modules du cours
+        const allLessons = [];
+        courseData.modules?.forEach((module, mIdx) => {
+          module.lecons?.forEach((lecon, lIdx) => {
+            allLessons.push({
+              id: lecon._id || `m${mIdx}-l${lIdx}`,
+              title: lecon.titre,
+              duration: `${lecon.duree || 0} min`,
+              videoUrl: lecon.videoUrl,
+              description: lecon.description || '',
+              resources: lecon.ressources || [],
+              completed: false,
+              progress: 0
+            });
+          });
         });
-        setLesson(lessonResponse.data);
+        setLessons(allLessons);
         
-        const lessonsResponse = await axios.get(`${API_BASE}/cours/${courseId}/lecons`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setLessons(lessonsResponse.data);
+        // Trouver la leçon actuelle
+        const currentLesson = allLessons.find(l => l.id === lessonId);
+        if (currentLesson) {
+          // Calculer les leçons précédente et suivante
+          const currentIdx = allLessons.indexOf(currentLesson);
+          currentLesson.prevLesson = currentIdx > 0 ? { id: allLessons[currentIdx - 1].id, title: allLessons[currentIdx - 1].title } : null;
+          currentLesson.nextLesson = currentIdx < allLessons.length - 1 ? { id: allLessons[currentIdx + 1].id, title: allLessons[currentIdx + 1].title } : null;
+          setLesson(currentLesson);
+        } else if (allLessons.length > 0) {
+          // Si la leçon n'est pas trouvée, charger la première
+          const first = allLessons[0];
+          first.nextLesson = allLessons.length > 1 ? { id: allLessons[1].id, title: allLessons[1].title } : null;
+          first.prevLesson = null;
+          setLesson(first);
+        }
         
         toast.success("📚 Leçon chargée");
       } catch (apiError) {
@@ -88,14 +111,8 @@ function LessonPlayer() {
             { id: 2, title: "Exercices pratiques", type: "doc", url: "#", size: "1.8 MB" },
             { id: 3, title: "Audio de répétition", type: "mp3", url: "#", size: "5.2 MB" }
           ],
-          nextLesson: {
-            id: "l2",
-            title: "Les lettres solaires et lunaires"
-          },
-          prevLesson: {
-            id: "l0",
-            title: "Introduction au cours"
-          }
+          nextLesson: { id: "l2", title: "Les lettres solaires et lunaires" },
+          prevLesson: { id: "l0", title: "Introduction au cours" }
         };
         setLesson(mockLesson);
 
@@ -116,13 +133,20 @@ function LessonPlayer() {
     }
   };
 
-  const loadProgress = () => {
-    const progress = JSON.parse(localStorage.getItem(`lesson-progress-${courseId}`) || '{}');
-    setCompleted(!!progress[lessonId]);
-    
-    const position = progress[`${lessonId}-position`];
-    if (position && videoRef.current) {
-      videoRef.current.currentTime = position;
+  const loadProgress = async () => {
+    try {
+      const response = await api.get(`/progress/cours/${courseId}`);
+      const data = response.data.data;
+      if (data) {
+        // Vérifier si la leçon courante est complétée
+        setCompleted(data.completedLessons?.includes?.(lessonId) || false);
+        // Restaurer la position vidéo si c'est la même leçon
+        if (data.currentLesson === lessonId && data.currentPosition && videoRef.current) {
+          videoRef.current.currentTime = data.currentPosition;
+        }
+      }
+    } catch (error) {
+      console.log('Progression non trouvée, démarrage à zéro');
     }
   };
 
@@ -138,15 +162,23 @@ function LessonPlayer() {
     setBookmarks(saved);
   };
 
-  const saveProgress = () => {
+  const saveProgress = async () => {
     if (!videoRef.current) return;
 
-    const progress = JSON.parse(localStorage.getItem(`lesson-progress-${courseId}`) || '{}');
-    progress[lessonId] = completed;
-    progress[`${lessonId}-position`] = videoRef.current.currentTime;
-    progress[`${lessonId}-last-watched`] = new Date().toISOString();
-    
-    localStorage.setItem(`lesson-progress-${courseId}`, JSON.stringify(progress));
+    try {
+      await api.patch(`/progress/cours/${courseId}/lecon/${lessonId}`, {
+        completed: completed,
+        position: videoRef.current.currentTime,
+        durationWatched: videoRef.current.currentTime
+      });
+    } catch (error) {
+      console.error('Erreur sauvegarde progression:', error);
+      // Fallback localStorage
+      const progress = JSON.parse(localStorage.getItem(`lesson-progress-${courseId}`) || '{}');
+      progress[lessonId] = completed;
+      progress[`${lessonId}-position`] = videoRef.current.currentTime;
+      localStorage.setItem(`lesson-progress-${courseId}`, JSON.stringify(progress));
+    }
   };
 
   const togglePlay = () => {
@@ -226,30 +258,35 @@ function LessonPlayer() {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const handleComplete = () => {
-    setCompleted(!completed);
+  const handleComplete = async () => {
+    const newCompleted = !completed;
+    setCompleted(newCompleted);
     
-    const progress = JSON.parse(localStorage.getItem(`lesson-progress-${courseId}`) || '{}');
-    progress[lessonId] = !completed;
-    localStorage.setItem(`lesson-progress-${courseId}`, JSON.stringify(progress));
-    
-    if (!completed) {
-      toast.success("✅ Leçon marquée comme terminée !");
+    try {
+      // Sauvegarder vers le backend
+      const response = await api.patch(`/progress/cours/${courseId}/lecon/${lessonId}`, {
+        completed: newCompleted,
+        position: videoRef.current?.currentTime || 0
+      });
       
-      const allLessons = lessons.map(l => l.id);
-      const completedLessons = Object.keys(progress).filter(key => 
-        allLessons.includes(key) && progress[key] === true
-      );
-      
-      if (completedLessons.length === allLessons.length) {
-        toast.success("🎉 Félicitations ! Vous avez terminé toutes les leçons !");
+      if (newCompleted) {
+        toast.success("✅ Leçon marquée comme terminée !");
         
-        setTimeout(() => {
-          if (window.confirm("Voulez-vous passer le quiz final maintenant ?")) {
-            navigate(`/quiz/cours/${courseId}/final`);
-          }
-        }, 1000);
+        // Vérifier si toutes les leçons sont terminées
+        const progressData = response.data.data;
+        if (progressData?.progress === 100) {
+          toast.success("🎉 Félicitations ! Vous avez terminé toutes les leçons !");
+          
+          setTimeout(() => {
+            if (window.confirm("Voulez-vous passer le quiz final maintenant ?")) {
+              navigate(`/quiz/cours/${courseId}/final`);
+            }
+          }, 1000);
+        }
       }
+    } catch (error) {
+      console.error('Erreur mise à jour progression:', error);
+      toast.error("Erreur de sauvegarde de la progression");
     }
   };
 

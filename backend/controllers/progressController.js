@@ -1,5 +1,6 @@
 const Progress = require('../models/Progress');
 const Cours = require('../models/Cours');
+const QuizResult = require('../models/QuizResult');
 
 /**
  * Récupérer la progression d'un étudiant
@@ -166,7 +167,7 @@ const getCourseProgress = async (req, res) => {
       success: true,
       data: {
         progress: progress?.progress || 0,
-        completedLessons: progress?.completedLessons.length || 0,
+        completedLessons: progress?.completedLessons || [],
         totalLessons,
         currentLesson: progress?.currentLesson,
         currentPosition: progress?.currentPosition || 0,
