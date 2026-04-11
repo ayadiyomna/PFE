@@ -26,7 +26,6 @@ function CourseDetail() {
     setUser(userData);
     
     loadCourse();
-    checkEnrollment();
     loadReviews();
     loadProgress();
   }, [id]);
@@ -50,15 +49,26 @@ function CourseDetail() {
   };
 
   const checkEnrollment = async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !user || !course) return;
     
     try {
-      const enrolled = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-      setIsEnrolled(enrolled.includes(id) || enrolled.includes(parseInt(id)));
+      // Déterminer l'état d'inscription depuis les données du backend
+      const isUserEnrolled = course.students?.some(s => {
+        const studentId = s._id ? s._id.toString() : s.toString();
+        return studentId === user.id?.toString() || studentId === user._id?.toString();
+      });
+      setIsEnrolled(isUserEnrolled);
     } catch (error) {
       console.error("Erreur vérification inscription:", error);
     }
   };
+
+  // On relance la vérification chaque fois que l'utilisateur ou le cours change
+  useEffect(() => {
+    if (course && user) {
+      checkEnrollment();
+    }
+  }, [course, user]);
 
   const loadReviews = async () => {
     try {

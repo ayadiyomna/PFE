@@ -217,8 +217,12 @@ router.post('/:id/inscrire', protect, async (req, res) => {
       });
     }
     
-    // Vérifier si déjà inscrit
-    if (cours.students.includes(req.user._id)) {
+    // Vérifier si déjà inscrit (comparaison Mongoose ObjectId)
+    const isAlreadyEnrolled = cours.students.some(
+      studentId => studentId.toString() === req.user._id.toString()
+    );
+    
+    if (isAlreadyEnrolled) {
       return res.status(400).json({ 
         success: false, 
         message: 'Vous êtes déjà inscrit à ce cours' 

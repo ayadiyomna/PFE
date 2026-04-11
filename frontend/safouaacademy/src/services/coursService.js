@@ -375,7 +375,7 @@ class CoursService {
    */
   async getStudentCourses() {
     try {
-      const response = await api.get('/etudiant/mes-cours');
+      const response = await api.get('/cours/etudiant/mes-cours');
       return {
         success: true,
         data: response.data.data || response.data
@@ -409,7 +409,7 @@ class CoursService {
    */
   async getTeacherCourses() {
     try {
-      const response = await api.get('/enseignant/mes-cours');
+      const response = await api.get('/cours/enseignant/mes-cours');
       return {
         success: true,
         data: response.data.data || response.data

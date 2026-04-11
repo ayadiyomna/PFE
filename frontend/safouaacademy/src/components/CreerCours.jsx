@@ -173,26 +173,26 @@ function CreerCours() {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
 
-      // Préparer les données du cours
+      // Préparer les données du cours avec les bonnes clés attendues par le backend
       const courseData = {
         titre: formData.title,
         description: formData.description,
-        category: formData.category,
+        categorie: formData.category,
         niveau: formData.level,
-        language: formData.language,
-        duration: formData.duration,
+        langue: formData.language,
         prix: parseFloat(formData.price),
         image: formData.imagePreview || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop",
-        instructor: user?.name || "Enseignant",
-        instructorId: user?.id,
-        objectives: formData.objectives,
-        prerequisites: formData.prerequisites,
-        curriculum: formData.curriculum,
-        students: 0,
-        rating: 0,
-        reviews: 0,
-        certificate: true,
-        lastUpdated: new Date().toISOString().split('T')[0],
+        objectifs: formData.objectives,
+        prerequis: formData.prerequisites,
+        modules: formData.curriculum.map((m, index) => ({
+          titre: m.title,
+          ordre: index + 1,
+          lecons: Array.from({ length: m.lessons }).map((_, i) => ({
+            titre: `Leçon ${i + 1}`,
+            ordre: i + 1
+          }))
+        })),
+        certificat: true,
         status: "Publié"
       };
 
