@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import api from "../services/api";           // ← AJOUTÉ
+import coursService from "../services/coursService"; // ← AJOUTÉ
+import authService from "../services/authService";   // ← AJOUTÉ
 
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -7,14 +10,12 @@ function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
   
-  // Données statiques des étudiants
-  const [students, setStudents] = useState([
-    { id: 301, nom: "M. Ait Ali", cours: "Tajwid Avancé", progression: 64 },
-    { id: 302, nom: "S. Rahmani", cours: "Arabe Classique", progression: 52 },
-    { id: 303, nom: "L. Bernard", cours: "Fiqh & Usul", progression: 41 }
-  ]);
+  // ← REMPLACÉ : Données réelles au lieu de statiques
+  const [users, setUsers] = useState([]);
+  const [cours, setCours] = useState([]);
+  const [loading, setLoading] = useState(true);
   
-  // États pour les modales
+  // États pour les modales (inchangés)
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -23,9 +24,58 @@ function AdminDashboard() {
     cours: "",
     progression: 0
   });
-  const [newId, setNewId] = useState(304);
 
-  // Vérification d'authentification
+ const loadUsers = async () => {
+  console.log("🔍 === DÉBUT loadUsers ===");
+  
+  try {
+    setLoading(true);
+    let result;
+    
+    try {
+      console.log("Test 1: /users");
+      result = await api.get('/users');
+      console.log("✅ /users OK:", result?.data?.data?.length || 0);
+    } catch (e1) {
+      console.log("❌ /users FAIL");
+      // ... autres tests
+    }
+    
+    console.log("RESULTAT FINAL:", result);
+    
+    // ✅ FIX : result.data.data (structure de votre API)
+    if (result?.data?.data) {
+      console.log("📥 Setting users:", result.data.data.length);
+      setUsers(result.data.data);
+    } else if (result?.data) {
+      console.log("📥 Setting users (format plat):", result.data.length);
+      setUsers(result.data);
+    } else {
+      console.log("🚫 Aucun résultat valide");
+      setUsers([]);
+    }
+  } catch (error) {
+    console.log("💥 ERREUR:", error.message);
+    setUsers([]);
+  } finally {
+    setLoading(false);
+    console.log("🔍 === FIN loadUsers ===");
+  }
+};
+
+  const loadCourses = async () => {
+    try {
+      const result = await coursService.getAllCours();
+      if (result.success) {
+        setCours(result.data);
+      }
+    } catch (error) {
+      console.error("📚 Cours indisponibles:", error);
+      setCours([]);
+    }
+  };
+
+  // Vérification d'authentification (inchangée)
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
@@ -48,6 +98,9 @@ function AdminDashboard() {
         if (role === 'admin' || role === 'administrateur') {
           console.log("✅ Accès admin autorisé");
           setIsAuthorized(true);
+          // ← AJOUTÉ : Charger données après autorisation
+          loadUsers();
+          loadCourses();
         } else {
           console.log("❌ Pas admin, redirection vers home");
           navigate('/');
@@ -63,12 +116,11 @@ function AdminDashboard() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
+    authService.logout(); // ← AMÉLIORÉ
     navigate('/login');
   };
 
+  // Fonctions modales (inchangées)
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: name === "progression" ? parseInt(value) || 0 : value }));
@@ -97,19 +149,18 @@ function AdminDashboard() {
     }
 
     if (editingStudent) {
-      setStudents(students.map(s => 
-        s.id === editingStudent.id 
-          ? { ...s, nom: formData.nom, cours: formData.cours, progression: formData.progression }
-          : s
+      setUsers(users.map(u => 
+        u._id === editingStudent._id || u.id === editingStudent.id
+          ? { ...u, nom: formData.nom, cours: formData.cours, progression: formData.progression }
+          : u
       ));
     } else {
-      setStudents([...students, {
-        id: newId,
+      setUsers([...users, {
+        _id: `temp-${Date.now()}`,
         nom: formData.nom,
         cours: formData.cours,
         progression: formData.progression
       }]);
-      setNewId(newId + 1);
     }
     setShowStudentModal(false);
   };
@@ -120,7 +171,7 @@ function AdminDashboard() {
 
   const handleDeleteStudent = () => {
     if (deleteConfirm) {
-      setStudents(students.filter(s => s.id !== deleteConfirm));
+      setUsers(users.filter(u => u._id !== deleteConfirm && u.id !== deleteConfirm));
       setDeleteConfirm(null);
     }
   };
@@ -129,13 +180,16 @@ function AdminDashboard() {
     setDeleteConfirm(null);
   };
 
-  const filteredStudents = students.filter(student =>
-    student.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.cours.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // ← AMÉLIORÉ : Filtre pour vraies données users
+ const filteredUsers = (Array.isArray(users) ? users : []).filter(user =>
+  (user.nom || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+  (user.prenom || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+  (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+  ((user.prenom || '') + ' ' + (user.nom || '')).toLowerCase().includes(searchTerm.toLowerCase())
+);
 
-  // Afficher un loader pendant la vérification
-  if (!isAuthorized) {
+  // Loader pendant vérif + chargement
+  if (!isAuthorized || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600"></div>
@@ -145,7 +199,7 @@ function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Modal de confirmation suppression */}
+      {/* Modales INCHANGÉES */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
@@ -171,14 +225,12 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* Modal Ajout/Édition Étudiant */}
       {showStudentModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-lg w-full p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">
               {editingStudent ? 'Modifier' : 'Ajouter'} un étudiant
             </h3>
-            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Nom complet</label>
@@ -191,7 +243,6 @@ function AdminDashboard() {
                   placeholder="Ex: M. Ait Ali"
                 />
               </div>
-              
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Cours</label>
                 <input
@@ -203,7 +254,6 @@ function AdminDashboard() {
                   placeholder="Ex: Tajwid Avancé"
                 />
               </div>
-              
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Progression (%)</label>
                 <input
@@ -218,7 +268,6 @@ function AdminDashboard() {
                 />
               </div>
             </div>
-            
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleSaveStudent}
@@ -237,7 +286,7 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* HEADER avec Sidebar intégrée */}
+      {/* HEADER INCHANGÉ */}
       <header className="bg-white shadow-md border-t-4 border-emerald-600 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
@@ -250,13 +299,13 @@ function AdminDashboard() {
               onClick={() => setActiveTab("students")}
               className={activeTab === "students" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}
             >
-              Étudiants
+              Étudiants ({filteredUsers.length})
             </button>
             <button 
-              onClick={() => setActiveTab("courses")}
+                            onClick={() => setActiveTab("courses")}
               className={activeTab === "courses" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}
             >
-              Cours
+              Cours ({cours.length})
             </button>
             <span className="text-gray-400 text-sm ml-4">PARAMÈTRES</span>
             <button 
@@ -292,13 +341,13 @@ function AdminDashboard() {
       {/* MAIN CONTENT */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Barre de recherche */}
+        {/* Barre de recherche AMÉLIORÉE */}
         <div className="mb-6">
           <div className="relative">
             <span className="absolute left-4 top-3 text-gray-400">🔍</span>
             <input
               type="text"
-              placeholder="Rechercher des étudiants..."
+              placeholder="Rechercher étudiants, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -306,7 +355,7 @@ function AdminDashboard() {
           </div>
         </div>
 
-        {/* Students Tab */}
+        {/* ✅ STUDENTS TAB - DONNÉES RÉELLES */}
         {activeTab === "students" && (
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
@@ -319,45 +368,47 @@ function AdminDashboard() {
               </button>
             </div>
 
-            {filteredStudents.length > 0 ? (
+            {filteredUsers.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">ID</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">NOM</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">COURS</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">PROGRESSION</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">EMAIL</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">RÔLE</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredStudents.map((student) => (
-                      <tr key={student.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{student.id}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{student.nom}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{student.cours}</td>
+                    {filteredUsers.map((user) => (
+                      <tr key={user._id || user.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {user._id ? user._id.slice(-6) : 'N/A'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {user.prenom || ''} {user.nom || 'N/A'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{user.email || 'N/A'}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-emerald-600 rounded-full" 
-                                style={{ width: `${student.progression}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-semibold text-gray-700">{student.progression}%</span>
-                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            user.role === 'etudiant' ? 'bg-blue-100 text-blue-800' : 
+                            user.role === 'admin' ? 'bg-emerald-100 text-emerald-800' : 
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {user.role || 'etudiant'}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleEditStudent(student)}
+                              onClick={() => handleEditStudent(user)}
                               className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"
                             >
                               Modifier
                             </button>
                             <button
-                              onClick={() => confirmDelete(student.id)}
+                              onClick={() => confirmDelete(user._id || user.id)}
                               className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"
                             >
                               Supprimer
@@ -372,7 +423,12 @@ function AdminDashboard() {
             ) : (
               <div className="text-center py-12">
                 <span className="text-6xl mb-4 block">👥</span>
-                <p className="text-gray-500">Aucun étudiant trouvé</p>
+                <p className="text-gray-500">
+                  {users.length === 0 ? 'Aucun étudiant disponible' : 'Aucun étudiant trouvé'}
+                </p>
+                {users.length === 0 && (
+                  <p className="text-sm text-gray-400 mb-4">Endpoint /users nécessaire</p>
+                )}
                 <button
                   onClick={handleAddStudent}
                   className="mt-4 text-emerald-600 hover:text-emerald-700 font-semibold"
@@ -384,41 +440,41 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* Courses Tab */}
+        {/* ✅ COURSES TAB - DONNÉES RÉELLES */}
         {activeTab === "courses" && (
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Gestion des Cours</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900">Tajwid Avancé</h3>
-                <p className="text-sm text-gray-600 mt-1">Niveau Expert</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-emerald-600 font-bold">12 étudiants</span>
-                  <span className="text-sm text-gray-500">Prog. moy. 64%</span>
-                </div>
+            {cours.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cours.map((course) => (
+                  <div key={course._id} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition cursor-pointer group">
+                    <h3 className="font-bold text-gray-900 mb-2 line-clamp-1 text-lg">{course.titre}</h3>
+                    <p className="text-sm text-gray-600 mb-1">
+                      {course.categorie} • {course.niveau}
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4 line-clamp-2">{course.description}</p>
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <span className="text-emerald-600 font-bold">
+                        {course.students?.length || 0} étudiants
+                      </span>
+                      <span className="text-sm text-gray-500 font-semibold">
+                        {course.prix === 0 ? 'Gratuit' : `${course.prix} DT`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900">Arabe Classique</h3>
-                <p className="text-sm text-gray-600 mt-1">Niveau Intermédiaire</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-emerald-600 font-bold">8 étudiants</span>
-                  <span className="text-sm text-gray-500">Prog. moy. 52%</span>
-                </div>
+            ) : (
+              <div className="text-center py-12">
+                <span className="text-6xl mb-4 block">📚</span>
+                <p className="text-gray-500">Aucun cours trouvé</p>
               </div>
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900">Fiqh & Usul</h3>
-                <p className="text-sm text-gray-600 mt-1">Niveau Avancé</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-emerald-600 font-bold">6 étudiants</span>
-                  <span className="text-sm text-gray-500">Prog. moy. 41%</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
-        {/* Settings Tab */}
+        {/* SETTINGS TAB - AMÉLIORÉ avec vraies stats */}
         {activeTab === "settings" && (
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Paramètres de la plateforme</h2>
@@ -437,11 +493,11 @@ function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Email de contact</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Total utilisateurs</label>
                     <input
-                      type="email"
-                      value="contact@safoua.com"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50"
+                      type="text"
+                      value={users.length}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-emerald-50 font-semibold text-emerald-700"
                       readOnly
                     />
                   </div>
@@ -453,21 +509,23 @@ function AdminDashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-500">Total étudiants</p>
-                    <p className="text-2xl font-bold text-emerald-600">{students.length}</p>
+                    <p className="text-2xl font-bold text-emerald-600">{users.length}</p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-500">Cours actifs</p>
-                    <p className="text-2xl font-bold text-emerald-600">3</p>
+                    <p className="text-2xl font-bold text-emerald-600">{cours.length}</p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500">Progression moyenne</p>
+                    <p className="text-sm text-gray-500">Catégories</p>
                     <p className="text-2xl font-bold text-emerald-600">
-                      {Math.round(students.reduce((acc, s) => acc + s.progression, 0) / students.length)}%
+                      {[...new Set(cours.map(c => c.categorie))].length}
                     </p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500">Taux complétion</p>
-                    <p className="text-2xl font-bold text-emerald-600">52%</p>
+                    <p className="text-sm text-gray-500">Cours gratuits</p>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {cours.filter(c => c.prix === 0).length}
+                    </p>
                   </div>
                 </div>
               </div>

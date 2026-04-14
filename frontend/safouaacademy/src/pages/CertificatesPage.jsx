@@ -122,7 +122,7 @@ function CertificatesPage() {
             <Link to="/etudiant" className="text-gray-600 hover:text-emerald-600">
               Mes cours
             </Link>
-            <Link to="/progression" className="text-gray-600 hover:text-emerald-600">
+            <Link to="/etudiant/progression" className="text-gray-600 hover:text-emerald-600">
               Progression
             </Link>
             <Link to="/certificats" className="text-emerald-600 font-semibold">

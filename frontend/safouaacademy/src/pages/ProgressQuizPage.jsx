@@ -253,7 +253,7 @@ function ProgressQuizPage() {
             <Link to="/cours" className="text-gray-600 hover:text-emerald-600">Catalogue</Link>
             <Link to="/etudiant" className="text-gray-600 hover:text-emerald-600">Mes cours</Link>
             <Link to="/progression" className="text-emerald-600 font-semibold">Progression</Link>
-            <Link to="/certificats" className="text-gray-600 hover:text-emerald-600">Certificats</Link>
+            <Link to="/etudiant/certificats" className="text-gray-600 hover:text-emerald-600">Certificats</Link>
           </nav>
           
           <button 

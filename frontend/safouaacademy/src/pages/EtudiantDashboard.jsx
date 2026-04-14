@@ -213,10 +213,10 @@ function EtudiantDashboard() {
             >
               Mes cours ({myCourses.length})
             </button>
-            <Link to="/progression" className="text-gray-600 hover:text-emerald-600 transition">
+            <Link to="/etudiant/progression" className="text-gray-600 hover:text-emerald-600 transition">
               Progression
             </Link>
-            <Link to="/certificats" className="text-gray-600 hover:text-emerald-600 transition">
+            <Link to="/etudiant/certificats" className="text-gray-600 hover:text-emerald-600 transition">
               Certificats
             </Link>
             <button 
