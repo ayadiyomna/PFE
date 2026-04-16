@@ -15,6 +15,7 @@ const certificatRoutes = require('./routes/certificatRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/users", userRoutes);
 app.use("/api/cours", coursRoutes);
 app.use('/api/chat', chatRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Route de test racine
 app.get("/", (req, res) => {

@@ -24,6 +24,8 @@ import ProgressQuizPage from "./pages/ProgressQuizPage";
 import CertificatesPage from "./pages/CertificatesPage";
 import CreerCours from './components/CreerCours';
 import ChatWidget from './components/ChatWidget';
+import Success from "./pages/Success";
+import Cancel from "./pages/Cancel";
 
 // Composant de route protégée (amélioré pour accepter admin et administrateur)
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -181,7 +183,8 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/cours" element={<Cours />} />
             <Route path="/cours/:id" element={<CourseDetail />} />
-            
+            <Route path="/success" element={<Success />} />
+            <Route path="/cancel" element={<Cancel />} />
             {/* Routes de réinitialisation de mot de passe */}
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />

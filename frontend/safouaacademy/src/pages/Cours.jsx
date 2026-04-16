@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import "react-toastify/dist/ReactToastify.css";
 import coursService from "../services/coursService";
 import authService from "../services/authService";
-import api from "../services/api";
 
 function Cours() {
   const navigate = useNavigate();
@@ -21,15 +20,13 @@ function Cours() {
   const [levels, setLevels] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     setIsAuthenticated(!!token);
-    
     const userData = authService.getCurrentUser();
     setUser(userData);
-    
     loadCourses();
   }, []);
 
@@ -42,7 +39,6 @@ function Cours() {
     try {
       setLoading(true);
       const result = await coursService.getAllCours();
-      
       if (result.success) {
         setCours(result.data);
       }
@@ -54,48 +50,49 @@ function Cours() {
   };
 
   const extractFilters = () => {
-    const uniqueCategories = [...new Set(cours.map(c => c.categorie).filter(Boolean))];
-    const uniqueLevels = [...new Set(cours.map(c => c.niveau).filter(Boolean))];
+    const uniqueCategories = [...new Set(cours.map((c) => c.categorie).filter(Boolean))];
+    const uniqueLevels = [...new Set(cours.map((c) => c.niveau).filter(Boolean))];
     setCategories(uniqueCategories);
     setLevels(uniqueLevels);
   };
 
   const applyFilters = () => {
     let filtered = [...cours];
-    
+
     if (filters.category) {
-      filtered = filtered.filter(c => c.categorie === filters.category);
+      filtered = filtered.filter((c) => c.categorie === filters.category);
     }
-    
+
     if (filters.level) {
-      filtered = filtered.filter(c => c.niveau === filters.level);
+      filtered = filtered.filter((c) => c.niveau === filters.level);
     }
-    
+
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(c => 
-        c.titre?.toLowerCase().includes(searchLower) ||
-        c.description?.toLowerCase().includes(searchLower) ||
-        c.instructeur?.nom?.toLowerCase().includes(searchLower) ||
-        c.instructeur?.prenom?.toLowerCase().includes(searchLower)
+      filtered = filtered.filter(
+        (c) =>
+          c.titre?.toLowerCase().includes(searchLower) ||
+          c.description?.toLowerCase().includes(searchLower) ||
+          c.instructeur?.nom?.toLowerCase().includes(searchLower) ||
+          c.instructeur?.prenom?.toLowerCase().includes(searchLower)
       );
     }
 
     if (filters.priceMin) {
-      filtered = filtered.filter(c => c.prix >= parseInt(filters.priceMin));
+      filtered = filtered.filter((c) => c.prix >= parseInt(filters.priceMin));
     }
 
     if (filters.priceMax) {
-      filtered = filtered.filter(c => c.prix <= parseInt(filters.priceMax));
+      filtered = filtered.filter((c) => c.prix <= parseInt(filters.priceMax));
     }
-    
+
     setFilteredCourses(filtered);
   };
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-    if (name === 'category') {
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    if (name === "category") {
       setSelectedCategory(value);
     }
   };
@@ -108,70 +105,41 @@ function Cours() {
       priceMin: "",
       priceMax: ""
     });
-    setSelectedCategory('');
+    setSelectedCategory("");
   };
 
   const handleCategoryClick = (cat) => {
-    const newCat = selectedCategory === cat ? '' : cat;
+    const newCat = selectedCategory === cat ? "" : cat;
     setSelectedCategory(newCat);
-    setFilters(prev => ({ ...prev, category: newCat }));
+    setFilters((prev) => ({ ...prev, category: newCat }));
   };
 
-  // Grouper les cours filtrés par catégorie
   const coursesByCategory = filteredCourses.reduce((groups, course) => {
-    const cat = course.categorie || 'Autres';
+    const cat = course.categorie || "Autres";
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(course);
     return groups;
   }, {});
 
-  // Emoji par catégorie
   const categoryEmoji = {
-    'Coran': '📖',
-    'Langue Arabe': '🌍',
-    'Jurisprudence': '⚖️',
-    'Sciences Islamiques': '🕌',
-    'Hadith': '📜',
-    'Tajwid': '🎙️',
-    'Autres': '📚'
+    Coran: "📖",
+    "Langue Arabe": "🌍",
+    Jurisprudence: "⚖️",
+    "Sciences Islamiques": "🕌",
+    Hadith: "📜",
+    Tajwid: "🎙️",
+    Autres: "📚"
   };
 
   const handleViewCourse = (courseId) => {
     navigate(`/cours/${courseId}`);
   };
 
-  const handleEnrollCourse = async (courseId, e) => {
-    e.stopPropagation();
-    
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-
-    try {
-      const result = await coursService.enrollToCours(courseId);
-      if (result.success) {
-        loadCourses(); // Recharger pour mettre à jour le nombre d'étudiants
-      }
-    } catch (error) {
-      console.error("Erreur lors de l'inscription:", error);
-    }
-  };
-
   const handleLogout = () => {
     authService.logout();
     setIsAuthenticated(false);
     setUser(null);
-    navigate('/', { replace: true });
-  };
-
-  // Vérifier l'inscription depuis les données backend (course.students)
-  const isEnrolled = (course) => {
-    if (!user || !course.students) return false;
-    return course.students.some(s => {
-      const studentId = s._id ? s._id.toString() : s.toString();
-      return studentId === user._id?.toString() || studentId === user.id?.toString();
-    });
+    navigate("/", { replace: true });
   };
 
   return (
@@ -181,24 +149,27 @@ function Cours() {
           <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
             Safoua Academy
           </Link>
-          
+
           <nav className="hidden md:flex space-x-8">
-            <Link to="/" className="text-gray-600 hover:text-emerald-600">Accueil</Link>
-            <Link to="/cours" className="text-emerald-600 font-semibold">Catalogue</Link>
+            <Link to="/" className="text-gray-600 hover:text-emerald-600">
+              Accueil
+            </Link>
+            <Link to="/cours" className="text-emerald-600 font-semibold">
+              Catalogue
+            </Link>
             {!isAuthenticated ? (
-              <Link to="/login" className="text-gray-600 hover:text-emerald-600">Connexion</Link>
+              <Link to="/login" className="text-gray-600 hover:text-emerald-600">
+                Connexion
+              </Link>
             ) : (
-              <button
-                onClick={handleLogout}
-                className="text-red-600 hover:text-red-700"
-              >
+              <button onClick={handleLogout} className="text-red-600 hover:text-red-700">
                 Déconnexion
               </button>
             )}
           </nav>
-          
+
           {!isAuthenticated ? (
-            <Link 
+            <Link
               to="/login"
               className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
             >
@@ -206,7 +177,7 @@ function Cours() {
             </Link>
           ) : (
             <button
-              onClick={() => navigate('/etudiant')}
+              onClick={() => navigate("/etudiant")}
               className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
             >
               Mon compte
@@ -216,7 +187,6 @@ function Cours() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
         <h1 className="text-3xl font-bold text-gray-900 mb-6">Nos Cours Disponibles</h1>
 
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -258,8 +228,10 @@ function Cours() {
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="">Toutes</option>
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
                 ))}
               </select>
             </div>
@@ -275,8 +247,10 @@ function Cours() {
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="">Tous</option>
-                {levels.map(level => (
-                  <option key={level} value={level}>{level}</option>
+                {levels.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
                 ))}
               </select>
             </div>
@@ -298,39 +272,37 @@ function Cours() {
           </div>
         </div>
 
-        {/* Barre de catégories */}
         <div className="flex flex-wrap gap-2 mb-6">
           <button
-            onClick={() => handleCategoryClick('')}
+            onClick={() => handleCategoryClick("")}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
-              selectedCategory === ''
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-emerald-50 border border-gray-200'
+              selectedCategory === ""
+                ? "bg-emerald-600 text-white shadow-md"
+                : "bg-white text-gray-700 hover:bg-emerald-50 border border-gray-200"
             }`}
           >
             📋 Toutes ({filteredCourses.length})
           </button>
-          {categories.map(cat => {
-            const count = cours.filter(c => c.categorie === cat).length;
+
+          {categories.map((cat) => {
+            const count = cours.filter((c) => c.categorie === cat).length;
             return (
               <button
                 key={cat}
                 onClick={() => handleCategoryClick(cat)}
                 className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
                   selectedCategory === cat
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-emerald-50 border border-gray-200'
+                    ? "bg-emerald-600 text-white shadow-md"
+                    : "bg-white text-gray-700 hover:bg-emerald-50 border border-gray-200"
                 }`}
               >
-                {categoryEmoji[cat] || '📚'} {cat} ({count})
+                {categoryEmoji[cat] || "📚"} {cat} ({count})
               </button>
             );
           })}
         </div>
 
-        <p className="text-gray-600 mb-4">
-          {filteredCourses.length} cours trouvés
-        </p>
+        <p className="text-gray-600 mb-4">{filteredCourses.length} cours trouvés</p>
 
         {loading ? (
           <div className="flex justify-center py-12">
@@ -340,9 +312,8 @@ function Cours() {
           <div className="space-y-8">
             {Object.entries(coursesByCategory).map(([category, categoryCourses]) => (
               <div key={category}>
-                {/* En-tête de catégorie */}
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl">{categoryEmoji[category] || '📚'}</span>
+                  <span className="text-2xl">{categoryEmoji[category] || "📚"}</span>
                   <h2 className="text-2xl font-bold text-gray-900">{category}</h2>
                   <span className="bg-emerald-100 text-emerald-700 text-sm px-3 py-1 rounded-full font-semibold">
                     {categoryCourses.length} cours
@@ -351,14 +322,17 @@ function Cours() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {categoryCourses.map((c) => (
-                    <div 
-                      key={c._id} 
+                    <div
+                      key={c._id}
                       className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition cursor-pointer group"
                       onClick={() => handleViewCourse(c._id)}
                     >
                       <div className="relative h-48 overflow-hidden">
                         <img
-                          src={c.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=200&fit=crop"}
+                          src={
+                            c.image ||
+                            "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=200&fit=crop"
+                          }
                           alt={c.titre}
                           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                         />
@@ -374,18 +348,13 @@ function Cours() {
                             </span>
                           </div>
                         )}
-                        {isEnrolled(c) && (
-                          <div className="absolute bottom-3 right-3">
-                            <span className="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
-                              Inscrit ✓
-                            </span>
-                          </div>
-                        )}
                       </div>
 
                       <div className="p-5">
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-xl font-bold text-gray-900 line-clamp-1">{c.titre}</h3>
+                          <h3 className="text-xl font-bold text-gray-900 line-clamp-1">
+                            {c.titre}
+                          </h3>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <span className="text-yellow-400">★</span>
                             <span className="font-semibold">{c.rating || 4.5}</span>
@@ -420,15 +389,13 @@ function Cours() {
                             {c.prix === 0 ? "Gratuit" : `${c.prix} DT`}
                           </span>
                           <button
-                            onClick={(e) => handleEnrollCourse(c._id, e)}
-                            disabled={isEnrolled(c)}
-                            className={`px-4 py-2 rounded-lg transition font-semibold text-sm ${
-                              isEnrolled(c)
-                                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewCourse(c._id);
+                            }}
+                            className="px-4 py-2 rounded-lg transition font-semibold text-sm bg-emerald-600 text-white hover:bg-emerald-700"
                           >
-                            {isEnrolled(c) ? 'Inscrit' : "S'inscrire"}
+                            Voir le cours
                           </button>
                         </div>
                       </div>
