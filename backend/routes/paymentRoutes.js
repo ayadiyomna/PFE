@@ -1,14 +1,15 @@
 const express = require("express");
-const router = express.Router();
+const router = express.Router(); // <--- Cette ligne manquait probablement
 const Stripe = require("stripe");
 
+// Initialisation de Stripe (assurez-vous que votre .env est chargé dans server.js)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 router.post("/create-checkout-session", async (req, res) => {
   const { course } = req.body;
 
-  if (!course) {
-    return res.status(400).json({ error: "No course data provided" });
+  if (!course || course.prix === undefined) {
+    return res.status(400).json({ error: "Données du cours incomplètes" });
   }
 
   try {
@@ -20,10 +21,11 @@ router.post("/create-checkout-session", async (req, res) => {
           price_data: {
             currency: "usd",
             product_data: {
-              name: course.titre || "Cours Safoua Academy",
-              description: course.description || "Paiement du cours",
+              name: course.titre,
+              description: course.description,
+              images: course.image ? [course.image] : [],
             },
-            unit_amount: course.prix ? Math.round(course.prix * 100) : 500,
+            unit_amount: Math.round(Number(course.prix) * 100),
           },
           quantity: 1,
         },
@@ -34,7 +36,7 @@ router.post("/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (e) {
-    console.error("Stripe Error:", e.message);
+    console.error("Erreur Stripe :", e);
     res.status(500).json({ error: e.message });
   }
 });

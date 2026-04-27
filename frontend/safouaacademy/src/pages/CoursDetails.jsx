@@ -112,16 +112,13 @@ function CourseDetail() {
     if (!course) return;
 
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/payment/create-checkout-session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ course }),
-        }
-      );
+      const response = await fetch("http://localhost:5000/api/payment/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ course }),
+      });
 
       const data = await response.json();
 
@@ -215,11 +212,7 @@ function CourseDetail() {
       <header className="bg-white shadow-md border-t-4 border-emerald-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition"
-              title="Retour"
-            >
+            <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition" title="Retour">
               ←
             </button>
             <Link to="/" className="text-2xl font-extrabold text-emerald-700 tracking-wider">
@@ -315,8 +308,7 @@ function CourseDetail() {
                 <div>
                   <p className="text-sm text-gray-500">Durée</p>
                   <p className="font-semibold text-gray-900">
-                    {Math.floor((course.dureeTotale || 0) / 60)}h{" "}
-                    {(course.dureeTotale || 0) % 60}min
+                    {Math.floor((course.dureeTotale || 0) / 60)}h {(course.dureeTotale || 0) % 60}min
                   </p>
                 </div>
               </div>
@@ -325,9 +317,7 @@ function CourseDetail() {
                 <span className="text-2xl">👥</span>
                 <div>
                   <p className="text-sm text-gray-500">Étudiants</p>
-                  <p className="font-semibold text-gray-900">
-                    {course.students?.length || 0}
-                  </p>
+                  <p className="font-semibold text-gray-900">{course.students?.length || 0}</p>
                 </div>
               </div>
 
@@ -335,9 +325,7 @@ function CourseDetail() {
                 <span className="text-2xl">📚</span>
                 <div>
                   <p className="text-sm text-gray-500">Modules</p>
-                  <p className="font-semibold text-gray-900">
-                    {course.modules?.length || 0}
-                  </p>
+                  <p className="font-semibold text-gray-900">{course.modules?.length || 0}</p>
                 </div>
               </div>
 
@@ -345,9 +333,7 @@ function CourseDetail() {
                 <span className="text-2xl">🌐</span>
                 <div>
                   <p className="text-sm text-gray-500">Langue</p>
-                  <p className="font-semibold text-gray-900">
-                    {course.langue || "Français"}
-                  </p>
+                  <p className="font-semibold text-gray-900">{course.langue || "Français"}</p>
                 </div>
               </div>
             </div>

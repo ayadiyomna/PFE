@@ -339,21 +339,12 @@ function Home() {
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 w-full">
           <div className="max-w-2xl ml-0 lg:ml-8 animate-fadeInUp">
-            {/* Lien de la sourate Al-Fatiha - plus petit et à côté du texte */}
             <div className="flex items-center gap-3 mb-6">
               <h2 className="text-4xl md:text-6xl font-black text-white leading-tight drop-shadow-2xl">
                 Apprenez l'<span className="bg-gradient-to-r from-emerald-300 to-teal-200 bg-clip-text text-transparent">Islam</span>
                 <br />en ligne
               </h2>
-              <Link 
-                to="/fatiha" 
-                className="group flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full border border-emerald-300/30 transition-all transform hover:scale-105"
-              >
-                <span className="font-arabic text-emerald-300 text-lg" style={{ fontFamily: "'Amiri', 'Scheherazade New', 'Traditional Arabic', serif" }}>
-                  {versetArabe}
-                </span>
-                {getIcon("book-open", "w-4 h-4 text-emerald-300")}
-              </Link>
+              
             </div>
             
             <p className="text-lg md:text-xl text-white/90 mb-10 leading-relaxed max-w-xl">

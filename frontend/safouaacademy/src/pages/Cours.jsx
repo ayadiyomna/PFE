@@ -10,7 +10,7 @@ function Cours() {
   const [filteredCourses, setFilteredCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    category: "",
+    categorie: "",
     level: "",
     search: "",
     priceMin: "",
@@ -59,8 +59,8 @@ function Cours() {
   const applyFilters = () => {
     let filtered = [...cours];
 
-    if (filters.category) {
-      filtered = filtered.filter((c) => c.categorie === filters.category);
+    if (filters.categorie) {
+      filtered = filtered.filter((c) => c.categorie === filters.categorie);
     }
 
     if (filters.level) {
@@ -92,14 +92,14 @@ function Cours() {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
-    if (name === "category") {
+    if (name === "categorie") {
       setSelectedCategory(value);
     }
   };
 
   const resetFilters = () => {
     setFilters({
-      category: "",
+      categorie: "",
       level: "",
       search: "",
       priceMin: "",
@@ -111,7 +111,7 @@ function Cours() {
   const handleCategoryClick = (cat) => {
     const newCat = selectedCategory === cat ? "" : cat;
     setSelectedCategory(newCat);
-    setFilters((prev) => ({ ...prev, category: newCat }));
+    setFilters((prev) => ({ ...prev, categorie: newCat }));
   };
 
   const coursesByCategory = filteredCourses.reduce((groups, course) => {
@@ -151,35 +151,21 @@ function Cours() {
           </Link>
 
           <nav className="hidden md:flex space-x-8">
-            <Link to="/" className="text-gray-600 hover:text-emerald-600">
-              Accueil
-            </Link>
-            <Link to="/cours" className="text-emerald-600 font-semibold">
-              Catalogue
-            </Link>
+            <Link to="/" className="text-gray-600 hover:text-emerald-600">Accueil</Link>
+            <Link to="/cours" className="text-emerald-600 font-semibold">Catalogue</Link>
             {!isAuthenticated ? (
-              <Link to="/login" className="text-gray-600 hover:text-emerald-600">
-                Connexion
-              </Link>
+              <Link to="/login" className="text-gray-600 hover:text-emerald-600">Connexion</Link>
             ) : (
-              <button onClick={handleLogout} className="text-red-600 hover:text-red-700">
-                Déconnexion
-              </button>
+              <button onClick={handleLogout} className="text-red-600 hover:text-red-700">Déconnexion</button>
             )}
           </nav>
 
           {!isAuthenticated ? (
-            <Link
-              to="/login"
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
-            >
+            <Link to="/login" className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold">
               Se connecter
             </Link>
           ) : (
-            <button
-              onClick={() => navigate("/etudiant")}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
-            >
+            <button onClick={() => navigate("/etudiant")} className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold">
               Mon compte
             </button>
           )}
@@ -192,11 +178,8 @@ function Cours() {
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Filtres</h2>
-            {(filters.category || filters.level || filters.search || filters.priceMin || filters.priceMax) && (
-              <button
-                onClick={resetFilters}
-                className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
-              >
+            {(filters.categorie || filters.level || filters.search || filters.priceMin || filters.priceMax) && (
+              <button onClick={resetFilters} className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold">
                 Réinitialiser
               </button>
             )}
@@ -204,9 +187,7 @@ function Cours() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Rechercher
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Rechercher</label>
               <input
                 type="text"
                 name="search"
@@ -218,28 +199,22 @@ function Cours() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Catégorie
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Catégorie</label>
               <select
-                name="category"
-                value={filters.category}
+                name="categorie"
+                value={filters.categorie}
                 onChange={handleFilterChange}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="">Toutes</option>
                 {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
+                  <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Niveau
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Niveau</label>
               <select
                 name="level"
                 value={filters.level}
@@ -248,17 +223,13 @@ function Cours() {
               >
                 <option value="">Tous</option>
                 {levels.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
+                  <option key={level} value={level}>{level}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Prix max (DT)
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Prix max (DT)</label>
               <input
                 type="number"
                 name="priceMax"
@@ -352,9 +323,7 @@ function Cours() {
 
                       <div className="p-5">
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-xl font-bold text-gray-900 line-clamp-1">
-                            {c.titre}
-                          </h3>
+                          <h3 className="text-xl font-bold text-gray-900 line-clamp-1">{c.titre}</h3>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <span className="text-yellow-400">★</span>
                             <span className="font-semibold">{c.rating || 4.5}</span>
@@ -409,10 +378,7 @@ function Cours() {
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <span className="text-6xl mb-4 block">🔍</span>
             <p className="text-gray-500 text-lg mb-4">Aucun cours trouvé</p>
-            <button
-              onClick={resetFilters}
-              className="text-emerald-600 font-semibold hover:underline"
-            >
+            <button onClick={resetFilters} className="text-emerald-600 font-semibold hover:underline">
               Réinitialiser les filtres
             </button>
           </div>
