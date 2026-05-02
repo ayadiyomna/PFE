@@ -57,7 +57,7 @@ router.get('/courslist', async (req, res) => {
   }
 });
 
-router.get('/enseignant/mes-cours', protect, authorizeRoles('enseignant', 'admin'), async (req, res) => {
+router.get('/enseignant/mes-cours', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
   try {
     const cours = await Cours.find({ instructeur: req.user._id }).sort('-createdAt');
     res.json({ success: true, data: cours });
@@ -86,11 +86,11 @@ router.get('/etudiant/mes-cours', protect, async (req, res) => {
   }
 });
 
-router.post('/', protect, authorizeRoles('enseignant', 'admin'), async (req, res) => {
+router.post('/', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
   try {
     let instructeurId = req.user._id;
 
-    if (req.user.role === 'admin' && req.body.instructeur) {
+    if ((req.user.role === 'admin' || req.user.role === 'administrateur') && req.body.instructeur) {
       instructeurId = req.body.instructeur;
     }
 
@@ -100,6 +100,8 @@ router.post('/', protect, authorizeRoles('enseignant', 'admin'), async (req, res
       status: req.body.status || 'Brouillon',
       students: []
     };
+
+    console.log('📝 Données du cours reçues:', coursData);
 
     const cours = new Cours(coursData);
     await cours.save();
@@ -113,6 +115,7 @@ router.post('/', protect, authorizeRoles('enseignant', 'admin'), async (req, res
     console.error('Erreur dans POST /cours:', error);
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(e => e.message);
+      console.error('Erreurs de validation:', errors);
       return res.status(400).json({
         success: false,
         message: 'Erreur de validation',

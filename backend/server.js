@@ -51,6 +51,21 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Debug route - test if routes are registered
+app.get("/api/debug/routes", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "API Routes are registered",
+    routes: [
+      "GET /api/health",
+      "GET /api/users (requires auth + admin)",
+      "POST /api/users/register",
+      "POST /api/users/login",
+      "GET /api/cours"
+    ]
+  });
+});
+
 // Routes principales
 app.use("/api/users", userRoutes);
 app.use("/api/cours", coursRoutes);

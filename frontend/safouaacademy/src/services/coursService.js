@@ -101,7 +101,9 @@ class CoursService {
 
   async createCours(coursData) {
     try {
+      console.log('📤 Envoi données cours:', coursData);
       const response = await api.post("/cours", coursData);
+      console.log('✅ Cours créé:', response.data);
       await this.syncLocalCourses();
       return {
         success: true,
@@ -109,15 +111,27 @@ class CoursService {
         message: "Cours créé avec succès !"
       };
     } catch (error) {
-      console.error("Erreur createCours:", error);
+      console.error("❌ Erreur createCours:", error);
+      console.error("❌ Réponse erreur:", error.response?.data);
 
       if (error.isOffline) {
         return this.saveOfflineCourse(coursData);
       }
 
+      // Extract validation errors array if available
+      const errors = error.response?.data?.errors;
+      const errorMessage = error.response?.data?.message || error.message || "Erreur lors de la création";
+      
+      if (Array.isArray(errors) && errors.length > 0) {
+        return {
+          success: false,
+          message: `${errorMessage}: ${errors.join(', ')}`
+        };
+      }
+
       return {
         success: false,
-        message: error.message || "Erreur lors de la création"
+        message: errorMessage
       };
     }
   }
