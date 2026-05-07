@@ -5,6 +5,7 @@ const progressController = require('../controllers/progressController');
 
 // Routes protégées
 router.get('/etudiant', protect, progressController.getProgress);
+router.get('/echeances', protect, progressController.getUpcomingDeadlines);
 router.get('/cours/:courseId', protect, progressController.getCourseProgress);
 router.patch('/cours/:courseId/lecon/:lessonId', protect, progressController.updateLessonProgress);
 

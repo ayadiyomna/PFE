@@ -3,6 +3,31 @@ const router = express.Router();
 const { protect, authorizeRoles } = require('../middlewares/authMiddleware');
 const Cours = require('../models/Cours');
 const User = require('../models/User');
+const Progress = require('../models/Progress');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Multer setup for resource uploads (pdf, video, audio)
+const resourcesDir = path.join(__dirname, '../uploads/resources');
+if (!fs.existsSync(resourcesDir)) fs.mkdirSync(resourcesDir, { recursive: true });
+
+const resourceStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, resourcesDir),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  }
+});
+
+const resourceFileFilter = (req, file, cb) => {
+  const allowed = /pdf|mp4|mkv|mov|webm|mp3|wav|ogg|doc|docx|ppt|pptx/;
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowed.test(ext)) cb(null, true);
+  else cb(new Error('Type de fichier non autorisé'));
+};
+
+const resourceUpload = multer({ storage: resourceStorage, limits: { fileSize: 200 * 1024 * 1024 }, fileFilter: resourceFileFilter });
 
 router.get('/health', (req, res) => {
   res.json({
@@ -52,6 +77,51 @@ router.get('/courslist', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération des cours',
+      error: error.message
+    });
+  }
+});
+
+router.get('/admin/courslist', protect, authorizeRoles('admin', 'administrateur'), async (req, res) => {
+  try {
+    const { categorie, niveau, status, search, page = 1, limit = 20 } = req.query;
+
+    let query = {};
+
+    if (categorie) query.categorie = categorie;
+    if (niveau) query.niveau = niveau;
+    if (status) query.status = status;
+
+    if (search) {
+      query.$or = [
+        { titre: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const cours = await Cours.find(query)
+      .populate('instructeur', 'nom prenom email')
+      .sort('-createdAt')
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Cours.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: cours,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Erreur dans /admin/courslist:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des cours admin',
       error: error.message
     });
   }
@@ -294,7 +364,7 @@ router.put('/:id', protect, async (req, res) => {
       });
     }
 
-    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
       return res.status(403).json({
         success: false,
         message: 'Vous n\'êtes pas autorisé à modifier ce cours'
@@ -338,7 +408,7 @@ router.delete('/:id', protect, async (req, res) => {
       });
     }
 
-    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
       return res.status(403).json({
         success: false,
         message: 'Vous n\'êtes pas autorisé à supprimer ce cours'
@@ -357,6 +427,256 @@ router.delete('/:id', protect, async (req, res) => {
       success: false,
       message: error.message || 'Erreur lors de la suppression'
     });
+  }
+});
+
+// Helper: remove lesson ids from all Progress documents and recalc progress
+async function _removeLessonsFromProgress(courseId, lessonIds) {
+  try {
+    const progresses = await Progress.find({ cours: courseId });
+    for (const p of progresses) {
+      const before = p.completedLessons.length;
+      p.completedLessons = p.completedLessons.filter(id => !lessonIds.includes(id.toString()));
+      // Recalculate progress percentage
+      const course = await Cours.findById(courseId);
+      const totalLessons = course.modules?.reduce((s, m) => s + (m.lecons?.length || 0), 0) || 0;
+      p.progress = totalLessons === 0 ? 0 : Math.round((p.completedLessons.length / totalLessons) * 100);
+      await p.save();
+    }
+  } catch (err) {
+    console.error('Erreur lors du nettoyage des Progress après suppression de leçon/module:', err);
+  }
+}
+
+// === Modules CRUD ===
+router.post('/:courseId/modules', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.courseId);
+    if (!cours) return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
+      return res.status(403).json({ success: false, message: 'Vous n\'êtes pas autorisé à modifier ce cours' });
+    }
+
+    const newModule = {
+      titre: req.body.titre,
+      description: req.body.description || '',
+      ordre: req.body.ordre || (cours.modules.length + 1),
+      duree: req.body.duree || 0,
+      lecons: []
+    };
+
+    cours.modules.push(newModule);
+    await cours.save();
+
+    res.status(201).json({ success: true, data: cours.modules[cours.modules.length - 1], message: 'Module ajouté avec succès' });
+  } catch (error) {
+    console.error('Erreur dans POST /:courseId/modules:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de l\'ajout du module' });
+  }
+});
+
+router.put('/:courseId/modules/:moduleId', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.courseId);
+    if (!cours) return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
+      return res.status(403).json({ success: false, message: 'Vous n\'êtes pas autorisé à modifier ce cours' });
+    }
+
+    const moduleIndex = cours.modules.findIndex(m => m._id.toString() === req.params.moduleId);
+    if (moduleIndex === -1) return res.status(404).json({ success: false, message: 'Module non trouvé' });
+
+    cours.modules[moduleIndex] = { ...cours.modules[moduleIndex].toObject(), ...req.body, _id: cours.modules[moduleIndex]._id };
+    await cours.save();
+
+    res.json({ success: true, data: cours.modules[moduleIndex], message: 'Module mis à jour avec succès' });
+  } catch (error) {
+    console.error('Erreur dans PUT /:courseId/modules/:moduleId:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de la mise à jour du module' });
+  }
+});
+
+router.delete('/:courseId/modules/:moduleId', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.courseId);
+    if (!cours) return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
+      return res.status(403).json({ success: false, message: 'Vous n\'êtes pas autorisé à modifier ce cours' });
+    }
+
+    const module = cours.modules.id(req.params.moduleId);
+    if (!module) return res.status(404).json({ success: false, message: 'Module non trouvé' });
+
+    const lessonIds = (module.lecons || []).map(l => l._id.toString());
+    module.remove();
+    await cours.save();
+
+    // Cleanup progress
+    if (lessonIds.length) await _removeLessonsFromProgress(cours._id, lessonIds);
+
+    res.json({ success: true, message: 'Module supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur dans DELETE /:courseId/modules/:moduleId:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de la suppression du module' });
+  }
+});
+
+// === Leçons (Lessons) CRUD ===
+router.post('/:courseId/modules/:moduleId/lecons', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.courseId);
+    if (!cours) return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
+      return res.status(403).json({ success: false, message: 'Vous n\'êtes pas autorisé à modifier ce cours' });
+    }
+
+    const module = cours.modules.id(req.params.moduleId);
+    if (!module) return res.status(404).json({ success: false, message: 'Module non trouvé' });
+
+    const newLesson = {
+      titre: req.body.titre,
+      description: req.body.description || '',
+      videoUrl: req.body.videoUrl || '',
+      duree: req.body.duree || 0,
+      ordre: req.body.ordre || (module.lecons.length + 1),
+      ressources: req.body.ressources || []
+    };
+
+    module.lecons.push(newLesson);
+    await cours.save();
+
+    res.status(201).json({ success: true, data: module.lecons[module.lecons.length - 1], message: 'Leçon ajoutée avec succès' });
+  } catch (error) {
+    console.error('Erreur dans POST /:courseId/modules/:moduleId/lecons:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de l\'ajout de la leçon' });
+  }
+});
+
+router.put('/:courseId/modules/:moduleId/lecons/:lessonId', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.courseId);
+    if (!cours) return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
+      return res.status(403).json({ success: false, message: 'Vous n\'êtes pas autorisé à modifier ce cours' });
+    }
+
+    const module = cours.modules.id(req.params.moduleId);
+    if (!module) return res.status(404).json({ success: false, message: 'Module non trouvé' });
+
+    const lesson = module.lecons.id(req.params.lessonId);
+    if (!lesson) return res.status(404).json({ success: false, message: 'Leçon non trouvée' });
+
+    Object.assign(lesson, req.body);
+    await cours.save();
+
+    res.json({ success: true, data: lesson, message: 'Leçon mise à jour avec succès' });
+  } catch (error) {
+    console.error('Erreur dans PUT /:courseId/modules/:moduleId/lecons/:lessonId:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de la mise à jour de la leçon' });
+  }
+});
+
+router.delete('/:courseId/modules/:moduleId/lecons/:lessonId', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.courseId);
+    if (!cours) return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
+      return res.status(403).json({ success: false, message: 'Vous n\'êtes pas autorisé à modifier ce cours' });
+    }
+
+    const module = cours.modules.id(req.params.moduleId);
+    if (!module) return res.status(404).json({ success: false, message: 'Module non trouvé' });
+
+    const lesson = module.lecons.id(req.params.lessonId);
+    if (!lesson) return res.status(404).json({ success: false, message: 'Leçon non trouvée' });
+
+    const removedId = lesson._id.toString();
+    lesson.remove();
+    await cours.save();
+
+    // Cleanup progress entries that referenced this lesson
+    await _removeLessonsFromProgress(cours._id, [removedId]);
+
+    res.json({ success: true, message: 'Leçon supprimée avec succès' });
+  } catch (error) {
+    console.error('Erreur dans DELETE /:courseId/modules/:moduleId/lecons/:lessonId:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de la suppression de la leçon' });
+  }
+});
+
+// === Ressources ===
+router.post('/:courseId/modules/:moduleId/lecons/:lessonId/ressources', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.courseId);
+    if (!cours) return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
+      return res.status(403).json({ success: false, message: 'Vous n\'êtes pas autorisé à modifier ce cours' });
+    }
+
+    const module = cours.modules.id(req.params.moduleId);
+    if (!module) return res.status(404).json({ success: false, message: 'Module non trouvé' });
+
+    const lesson = module.lecons.id(req.params.lessonId);
+    if (!lesson) return res.status(404).json({ success: false, message: 'Leçon non trouvée' });
+
+    const newResource = {
+      titre: req.body.titre,
+      type: req.body.type || 'pdf',
+      url: req.body.url,
+      taille: req.body.taille || ''
+    };
+
+    lesson.ressources.push(newResource);
+    await cours.save();
+
+    res.status(201).json({ success: true, data: lesson.ressources[lesson.ressources.length - 1], message: 'Ressource ajoutée avec succès' });
+  } catch (error) {
+    console.error('Erreur dans POST ressources:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de l\'ajout de la ressource' });
+  }
+});
+
+router.delete('/:courseId/modules/:moduleId/lecons/:lessonId/ressources/:resourceId', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    const cours = await Cours.findById(req.params.courseId);
+    if (!cours) return res.status(404).json({ success: false, message: 'Cours non trouvé' });
+
+    if (cours.instructeur.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'administrateur') {
+      return res.status(403).json({ success: false, message: 'Vous n\'êtes pas autorisé à modifier ce cours' });
+    }
+
+    const module = cours.modules.id(req.params.moduleId);
+    if (!module) return res.status(404).json({ success: false, message: 'Module non trouvé' });
+
+    const lesson = module.lecons.id(req.params.lessonId);
+    if (!lesson) return res.status(404).json({ success: false, message: 'Leçon non trouvée' });
+
+    lesson.ressources = lesson.ressources.filter(r => r._id.toString() !== req.params.resourceId);
+    await cours.save();
+
+    res.json({ success: true, message: 'Ressource supprimée avec succès' });
+  } catch (error) {
+    console.error('Erreur dans DELETE ressource:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de la suppression de la ressource' });
+  }
+});
+
+// Upload file endpoint for resources (returns file URL path)
+router.post('/upload/resource', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), resourceUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Fichier manquant' });
+    const relativePath = path.relative(path.join(__dirname, '..'), req.file.path).split(path.sep).join('/');
+    res.status(201).json({ success: true, data: { url: `/${relativePath}` }, message: 'Fichier uploadé' });
+  } catch (error) {
+    console.error('Erreur dans POST /upload/resource:', error);
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de l\'upload' });
   }
 });
 

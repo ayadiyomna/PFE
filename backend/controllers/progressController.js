@@ -186,5 +186,46 @@ const getCourseProgress = async (req, res) => {
 module.exports = {
   getProgress,
   updateLessonProgress,
-  getCourseProgress
+  getCourseProgress,
+  getUpcomingDeadlines
 };
+
+/**
+ * Récupérer les échéances à venir pour l'étudiant (ex : devoirs, quiz, deadlines)
+ * Pour l'instant, si aucune donnée structurée n'est disponible dans le modèle,
+ * renvoyer une liste vide. On loggue les cours inscrits pour faciliter le debug.
+ */
+async function getUpcomingDeadlines(req, res) {
+  try {
+    const userId = req.user._id;
+
+    // Récupérer les cours où l'étudiant est inscrit
+    const enrolledCourses = await Cours.find({ students: userId });
+
+    console.log(`🔎 getUpcomingDeadlines for user ${userId} - enrolled courses: ${enrolledCourses.length}`);
+
+    // Exemple attendu par le frontend: { _id, course, task, dueDate }
+    // Si vous avez un modèle 'Assignment' ou des deadlines dans les cours, extrayez-les ici.
+    const Assignment = require('../models/Assignment');
+
+    // Récupérer les assignments pour les cours où l'utilisateur est inscrit, triés par dueDate
+    const courseIds = enrolledCourses.map(c => c._id);
+    const assignments = await Assignment.find({ cours: { $in: courseIds } })
+      .sort('dueDate')
+      .limit(20)
+      .lean();
+
+    // Transformer pour le frontend
+    const deadlines = assignments.map(a => ({
+      _id: a._id,
+      course: a.cours,
+      task: a.titre,
+      dueDate: a.dueDate
+    }));
+
+    res.json({ success: true, data: deadlines });
+  } catch (error) {
+    console.error('Erreur getUpcomingDeadlines:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+}

@@ -18,6 +18,8 @@ function CourseDetail() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -111,24 +113,29 @@ function CourseDetail() {
   const handleCheckout = async () => {
     if (!course) return;
 
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
     try {
-      const response = await fetch("http://localhost:5000/api/payment/create-checkout-session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ course }),
-      });
+      setCheckoutLoading(true);
+      setCheckoutError(null);
 
-      const data = await response.json();
+      const response = await api.post(`/payment/create-checkout-session`, { course });
+      const data = response.data;
 
-      if (data.url) {
+      if (data?.url) {
         window.location.href = data.url;
       } else {
+        const message = data?.error || data?.message || "Impossible de démarrer le paiement.";
         console.error("Stripe URL introuvable:", data);
+        setCheckoutError(message);
       }
     } catch (error) {
       console.error("Payment Error:", error);
+      setCheckoutError(error?.message || "Erreur serveur pendant le paiement.");
+    } finally {
+      setCheckoutLoading(false);
     }
   };
 
@@ -370,13 +377,19 @@ function CourseDetail() {
                 ) : (
                   <button
                     onClick={handleCheckout}
-                    className="bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold text-lg"
+                    disabled={checkoutLoading}
+                    className={`bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold text-lg ${
+                      checkoutLoading ? 'opacity-60 cursor-wait' : ''
+                    }`}
                   >
-                    Acheter le cours
+                    {checkoutLoading ? 'Traitement...' : 'Acheter le cours'}
                   </button>
                 )}
               </div>
             </div>
+            {checkoutError && (
+              <p className="text-red-600 mt-3">{checkoutError}</p>
+            )}
           </div>
         </div>
 

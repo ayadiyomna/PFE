@@ -30,6 +30,27 @@ class CoursService {
     }
   }
 
+  async getAdminCours(filters = {}) {
+    try {
+      const queryParams = new URLSearchParams(filters).toString();
+      const url = queryParams ? `/cours/admin/courslist?${queryParams}` : "/cours/admin/courslist";
+      const response = await api.get(url);
+
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: "Cours admin chargés avec succès"
+      };
+    } catch (error) {
+      console.error("Erreur getAdminCours:", error);
+
+      return {
+        success: false,
+        message: error.message || "Impossible de charger les cours admin"
+      };
+    }
+  }
+
   getOfflineCourses() {
     const localCourses = JSON.parse(localStorage.getItem("courses") || "[]");
 

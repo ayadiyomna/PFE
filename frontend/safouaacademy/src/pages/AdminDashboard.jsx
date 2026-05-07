@@ -26,8 +26,11 @@ function AdminDashboard() {
     niveau: "",
     prix: "",
     instructeur: "",
-    status: "Brouillon"
+    status: "Brouillon",
+    dureeTotale: ""
   });
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [deleteCourseId, setDeleteCourseId] = useState(null);
   const [formData, setFormData] = useState({ 
     nom: "", 
     prenom: "",
@@ -72,7 +75,7 @@ function AdminDashboard() {
 
   const loadCourses = async () => {
     try {
-      const result = await coursService.getAllCours();
+      const result = await coursService.getAdminCours();
       if (result.success) setCours(result.data);
       else setCours([]);
     } catch (error) {
@@ -125,8 +128,67 @@ function AdminDashboard() {
     const { name, value } = e.target;
     setCourseForm((prev) => ({
       ...prev,
-      [name]: name === "prix" ? parseFloat(value) || 0 : value
+      [name]: name === "prix" || name === "dureeTotale" ? parseFloat(value) || 0 : value
     }));
+  };
+
+  const resetCourseForm = () => {
+    setEditingCourse(null);
+    setCourseForm({
+      titre: "",
+      description: "",
+      categorie: "",
+      niveau: "",
+      prix: "",
+      instructeur: "",
+      status: "Brouillon",
+      dureeTotale: ""
+    });
+  };
+
+  const handleEditCourse = (course) => {
+    setEditingCourse(course);
+    setCourseForm({
+      titre: course.titre || "",
+      description: course.description || "",
+      categorie: course.categorie || "",
+      niveau: course.niveau || "",
+      prix: course.prix ?? "",
+      instructeur: course.instructeur?._id || course.instructeur || "",
+      status: course.status || "Brouillon",
+      dureeTotale: course.dureeTotale ?? ""
+    });
+    setActiveTab("create-espace");
+    setErrorMessage("");
+  };
+
+  const handleCancelCourseEdit = () => {
+    resetCourseForm();
+  };
+
+  const confirmDeleteCourse = (courseId) => {
+    setDeleteCourseId(courseId);
+    setErrorMessage("");
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!deleteCourseId) return;
+    setOperationLoading(true);
+    try {
+      const result = await coursService.deleteCours(deleteCourseId);
+      if (result.success) {
+        await loadCourses();
+        setDeleteCourseId(null);
+        resetCourseForm();
+        showMessage("Cours supprimé avec succès !");
+      } else {
+        showMessage(result.message || "Erreur lors de la suppression", true);
+      }
+    } catch (error) {
+      showMessage(error?.response?.data?.message || error.message || "Erreur serveur", true);
+    } finally {
+      setOperationLoading(false);
+    }
   };
 
   const handleAddStudent = () => {
@@ -267,6 +329,14 @@ function AdminDashboard() {
         showMessage("Le prix ne peut pas être négatif", true);
         return;
       }
+      if (!courseForm.dureeTotale && courseForm.dureeTotale !== 0) {
+        showMessage("La durée du cours est requise", true);
+        return;
+      }
+      if (parseFloat(courseForm.dureeTotale) < 0) {
+        showMessage("La durée ne peut pas être négative", true);
+        return;
+      }
       if (!courseForm.instructeur) {
         showMessage("Un enseignant doit être assigné au cours", true);
         return;
@@ -282,30 +352,29 @@ function AdminDashboard() {
         prix: parseFloat(courseForm.prix) || 0,
         instructeur: courseForm.instructeur,
         status: courseForm.status || "Brouillon",
-        students: []
+        dureeTotale: parseFloat(courseForm.dureeTotale) || 0
       };
+
+      if (!editingCourse) {
+        payload.students = [];
+      }
 
       console.log('📋 Payload envoyé:', payload);
 
-      const result = await coursService.createCours(payload);
+      let result;
+      if (editingCourse) {
+        result = await coursService.updateCours(editingCourse._id, payload);
+      } else {
+        result = await coursService.createCours(payload);
+      }
+
       if (result.success) {
-        showMessage("Espace de cours créé avec succès!", false);
-        
-        // Réinitialiser le formulaire
-        setCourseForm({
-          titre: "",
-          description: "",
-          categorie: "",
-          niveau: "",
-          prix: "",
-          instructeur: "",
-          status: "Brouillon"
-        });
-        
-        // Recharger les cours
+        showMessage(editingCourse ? "Cours mis à jour avec succès!" : "Espace de cours créé avec succès!", false);
+
+        resetCourseForm();
         await loadCourses();
       } else {
-        showMessage(result.message || "Erreur lors de la création du cours", true);
+        showMessage(result.message || (editingCourse ? "Erreur lors de la mise à jour du cours" : "Erreur lors de la création du cours"), true);
       }
     } catch (error) {
       console.error("Erreur lors de la création du cours:", error);
@@ -370,6 +439,18 @@ function AdminDashboard() {
             <div className="flex gap-3">
               <button onClick={handleDeleteStudent} disabled={operationLoading} className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">{operationLoading ? "Suppression..." : "Supprimer"}</button>
               <button onClick={cancelDelete} disabled={operationLoading} className="flex-1 border border-slate-200 py-2.5 rounded-xl font-semibold hover:bg-slate-50 disabled:opacity-50">Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteCourseId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-3">Confirmer suppression du cours</h3>
+            <p className="text-slate-600 mb-6">Cette action supprimera le cours de l’espace admin et ne peut pas être annulée.</p>
+            <div className="flex gap-3">
+              <button onClick={handleDeleteCourse} disabled={operationLoading} className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">{operationLoading ? "Suppression..." : "Supprimer"}</button>
+              <button onClick={() => setDeleteCourseId(null)} disabled={operationLoading} className="flex-1 border border-slate-200 py-2.5 rounded-xl font-semibold hover:bg-slate-50 disabled:opacity-50">Annuler</button>
             </div>
           </div>
         </div>
@@ -640,13 +721,23 @@ function AdminDashboard() {
                 {cours.map((course) => (
                   <div key={course._id} className="p-5 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:shadow-sm transition">
                     <div className="flex items-start justify-between gap-3">
-                      <h4 className="font-bold text-slate-900 line-clamp-1">{course.titre}</h4>
+                      <div>
+                        <h4 className="font-bold text-slate-900 line-clamp-1">{course.titre}</h4>
+                        <p className="text-xs text-slate-500 mt-1">{course.niveau} • {course.categorie}</p>
+                      </div>
                       <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">{course.prix === 0 ? "Gratuit" : `${course.prix} DT`}</span>
                     </div>
                     <p className="text-sm text-slate-500 mt-2 line-clamp-2">{course.description}</p>
-                    <div className="flex items-center justify-between mt-4 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mt-4 text-sm">
                       <span className="text-emerald-700 font-semibold">{course.students?.length || 0} étudiants</span>
-                      <span className="text-slate-500">{course.categorie}</span>
+                      <span className="text-slate-500">Durée: {course.dureeTotale ?? 0} min</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-4">
+                      <button onClick={() => handleEditCourse(course)} className="px-3 py-2 text-xs font-semibold rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition">Modifier</button>
+                      <button onClick={() => confirmDeleteCourse(course._id)} className="px-3 py-2 text-xs font-semibold rounded-xl border border-red-200 text-red-700 hover:bg-red-50 transition">Supprimer</button>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${course.status === "Publié" ? "bg-green-100 text-green-700" : course.status === "Archivé" ? "bg-gray-100 text-gray-700" : "bg-yellow-100 text-yellow-700"}`}>
+                        {course.status}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -656,8 +747,8 @@ function AdminDashboard() {
 
           {activeTab === "create-espace" && (
             <section className="bg-white rounded-3xl p-6 shadow-sm border border-emerald-100">
-              <h3 className="text-lg font-bold text-slate-900 mb-1">Créer un nouvel espace de cours</h3>
-              <p className="text-slate-600 text-sm mb-6">Remplissez tous les champs pour créer un nouvel espace de cours lié à un enseignant</p>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">{editingCourse ? "Modifier le cours" : "Créer un nouvel espace de cours"}</h3>
+              <p className="text-slate-600 text-sm mb-6">{editingCourse ? "Mettez à jour les informations du cours et enregistrez vos modifications." : "Remplissez tous les champs pour créer un nouvel espace de cours lié à un enseignant."}</p>
               
               {errorMessage && (
                 <div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-700 rounded-xl text-sm">
@@ -682,7 +773,7 @@ function AdminDashboard() {
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" 
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Catégorie *</label>
                   <input 
@@ -693,7 +784,7 @@ function AdminDashboard() {
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" 
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Niveau *</label>
                   <select 
@@ -711,7 +802,7 @@ function AdminDashboard() {
                   </select>
                   <p className="text-xs text-slate-500 mt-1">Valeurs acceptées: {VALID_NIVEAUX.join(', ')}</p>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Prix (DT) *</label>
                   <input 
@@ -723,7 +814,19 @@ function AdminDashboard() {
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" 
                   />
                 </div>
-                
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Durée (minutes) *</label>
+                  <input 
+                    name="dureeTotale" 
+                    type="number" 
+                    value={courseForm.dureeTotale} 
+                    onChange={handleCourseFormChange} 
+                    placeholder="Durée totale du cours" 
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+                  />
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Enseignant *</label>
                   <select 
@@ -740,7 +843,7 @@ function AdminDashboard() {
                     ))}
                   </select>
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Statut</label>
                   <select 
@@ -756,7 +859,7 @@ function AdminDashboard() {
                     ))}
                   </select>
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Description *</label>
                   <textarea 
@@ -775,24 +878,14 @@ function AdminDashboard() {
                   disabled={operationLoading}
                   className="flex-1 bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {operationLoading ? "Création en cours..." : "Créer l'espace de cours"}
+                  {operationLoading ? (editingCourse ? "Mise à jour en cours..." : "Création en cours...") : (editingCourse ? "Enregistrer les modifications" : "Créer l'espace de cours")}
                 </button>
                 <button 
-                  onClick={() => {
-                    setCourseForm({
-                      titre: "",
-                      description: "",
-                      categorie: "",
-                      niveau: "",
-                      prix: "",
-                      instructeur: "",
-                      status: "Brouillon"
-                    });
-                  }}
+                  onClick={handleCancelCourseEdit}
                   disabled={operationLoading}
                   className="flex-1 border border-slate-200 px-6 py-3 rounded-xl font-semibold hover:bg-slate-50 transition disabled:opacity-50"
                 >
-                  Réinitialiser
+                  {editingCourse ? "Annuler la modification" : "Réinitialiser"}
                 </button>
               </div>
 

@@ -27,6 +27,8 @@ function ProgressQuizPage() {
   const [quizAnswers, setQuizAnswers] = useState({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [quizResult, setQuizResult] = useState(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -89,18 +91,25 @@ function ProgressQuizPage() {
     if (!selectedQuiz) return;
 
     try {
+      setSubmitLoading(true);
+      setSubmitError(null);
+
       const response = await api.post('/quiz/submit', {
         quizId: selectedQuiz._id,
         answers: Object.values(quizAnswers)
       });
-      
+
       setQuizResult(response.data.data);
-      
+
       // Recharger les données
       loadQuizHistory();
       loadAvailableQuizzes();
     } catch (error) {
-      console.error("Erreur soumission quiz:", error);
+      console.error("Erreur soumission quiz:", error, error.response?.data);
+      setSubmitError(error?.message || error.response?.data?.message || 'Erreur lors de l\'envoi du quiz');
+    }
+    finally {
+      setSubmitLoading(false);
     }
   };
 
@@ -153,7 +162,7 @@ function ProgressQuizPage() {
                     <div className="mt-4 space-y-2">
                       {selectedQuiz.questionsList?.[currentQuestion]?.options?.map((option, index) => (
                         <label
-                          key={index}
+                          key={`${selectedQuiz._id || 'quiz'}-${currentQuestion}-${index}`}
                           className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${
                             quizAnswers[currentQuestion] === index
                               ? 'border-emerald-600 bg-emerald-50'
@@ -197,9 +206,10 @@ function ProgressQuizPage() {
                     {currentQuestion === (selectedQuiz.questions - 1) ? (
                       <button
                         onClick={handleSubmitQuiz}
-                        className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
+                        disabled={submitLoading}
+                        className={`bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold ${submitLoading ? 'opacity-60 cursor-wait' : ''}`}
                       >
-                        Terminer
+                        {submitLoading ? 'Envoi...' : 'Terminer'}
                       </button>
                     ) : (
                       <button
@@ -210,6 +220,9 @@ function ProgressQuizPage() {
                       </button>
                     )}
                   </div>
+                  {submitError && (
+                    <p className="text-red-600 mt-3">{submitError}</p>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-4">
@@ -358,7 +371,7 @@ function ProgressQuizPage() {
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Progression par cours</h2>
                   <div className="space-y-4">
                     {progressData.modules.map((module, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4">
+                      <div key={module.id || module._id || index} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
                             {module.completed && <span className="text-emerald-600">✓</span>}
@@ -392,8 +405,8 @@ function ProgressQuizPage() {
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Historique des quiz</h2>
                   {quizData.length > 0 ? (
                     <div className="space-y-3">
-                      {quizData.map((quiz) => (
-                        <div key={quiz.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                      {quizData.map((quiz, qIndex) => (
+                        <div key={quiz.id || quiz._id || qIndex} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-1">

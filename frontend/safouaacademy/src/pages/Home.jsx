@@ -2,19 +2,18 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Header from "../components/Header";
 import bg from "../assets/4.jpg";
 
 function Home() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState(null);
-  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState(null);
   const [hoveredFeature, setHoveredFeature] = useState(null);
-  const [hoveredNom, setHoveredNom] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -40,34 +39,6 @@ function Home() {
     { id: 7, name: "Sourates Courtes", desc: "Mémorisation débutants", link: "/cours?cat=sourates", colorClass: "from-teal-500 to-cyan-600", bgClass: "bg-teal-50" }
   ];
 
-  const nomsAllah = [
-    "Allah", "Ar-Rahman", "Ar-Rahim", "Al-Malik",
-    "Al-Quddus", "As-Salam", "Al-Mu'min", "Al-Muhaymin",
-    "Al-Aziz", "Al-Jabbar", "Al-Mutakabbir", "Al-Khaliq",
-    "Al-Bari", "Al-Musawwir", "Al-Gaffar", "Al-Qahhar",
-    "Al-Wahhab", "Ar-Razzaq", "Al-Fattah", "Al-Alim",
-    "Al-Qabid", "Al-Basit", "Al-Khafid", "Ar-Rafi",
-    "Al-Mu'izz", "Al-Mudhill", "As-Sami", "Al-Basir",
-    "Al-Hakam", "Al-Adl", "Al-Latif", "Al-Khabir",
-    "Al-Halim", "Al-Azim", "Al-Ghafur", "Ash-Shakur",
-    "Al-Ali", "Al-Kabir", "Al-Hafiz", "Al-Muqit",
-    "Al-Hasib", "Al-Jalil", "Al-Karim", "Ar-Raqib",
-    "Al-Mujib", "Al-Wasi", "Al-Hakim", "Al-Wadud",
-    "Al-Majid", "Al-Ba'ith", "Ash-Shahid", "Al-Haqq",
-    "Al-Wakil", "Al-Qawi", "Al-Matin", "Al-Wali",
-    "Al-Hamid", "Al-Muhsi", "Al-Mubdi", "Al-Mu'id",
-    "Al-Muhyi", "Al-Mumit", "Al-Hayy", "Al-Qayyum",
-    "Al-Wajid", "Al-Majid", "Al-Wahid", "Al-Ahad",
-    "As-Samad", "Al-Qadir", "Al-Muqtadir", "Al-Muqaddim",
-    "Al-Mu'akhkhir", "Al-Awwal", "Al-Akhir", "Az-Zahir",
-    "Al-Batin", "Al-Wali", "Al-Muta'ali", "Al-Barr",
-    "At-Tawwab", "Al-Muntaqim", "Al-Afu", "Ar-Ra'uf",
-    "Malik Al-Mulk", "Dhu Al-Jalal", "Al-Muqsit", "Al-Jami",
-    "Al-Ghani", "Al-Mughni", "Al-Mani", "Ad-Darr",
-    "An-Nafi", "An-Nur", "Al-Hadi", "Al-Badi",
-    "Al-Baqi", "Al-Warith", "Ar-Rashid"
-  ];
-  
   const versetArabe = "ٱلۡفَاتِحَةِ";
 
   useEffect(() => {
@@ -191,137 +162,7 @@ function Home() {
         theme="colored"
       />
 
-      {/* Header avec animation CSS pure */}
-      <header 
-        className={`fixed w-full z-50 transition-all duration-500 animate-slideDown ${
-          scrolled 
-            ? 'bg-white backdrop-blur-xl shadow-lg border-b border-emerald-100' 
-            : 'bg-white backdrop-blur-md'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            {/* Logo avec animation hover */}
-            <div 
-              className="relative transform transition-transform duration-300 hover:scale-105 cursor-pointer"
-            >
-              <h1 className="text-3xl font-black">
-                <span className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                  Safoua
-                </span>
-                <span className="text-emerald-700"> Academy</span>
-              </h1>
-              <div className="absolute -bottom-2 left-0 w-20 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
-            </div>
-
-            {/* Navigation desktop */}
-            <nav className="hidden md:flex items-center space-x-8">
-              <div className="transform transition-transform duration-200 hover:-translate-y-1">
-                <Link to="/" className="text-emerald-700 font-semibold relative group">
-                  Accueil
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-600 transition-all group-hover:w-full"></span>
-                </Link>
-              </div>
-              
-              <div className="transform transition-transform duration-200 hover:-translate-y-1">
-                <Link to="/cours" className="text-gray-700 hover:text-emerald-700 font-semibold relative group">
-                  Catalogue
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-600 transition-all group-hover:w-full"></span>
-                </Link>
-              </div>
-              
-              {/* Dropdown Catégories */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
-                  className="flex items-center gap-2 text-gray-700 hover:text-emerald-700 font-semibold bg-white rounded-xl px-4 py-2 shadow-md hover:shadow-xl border border-emerald-100 transition-all transform hover:scale-105"
-                >
-                  Catégories
-                  <span className={`transition-transform duration-300 ${isCategoriesOpen ? 'rotate-180' : ''}`}>
-                    {getIcon("chevron-down", "w-4 h-4")}
-                  </span>
-                </button>
-                
-                {isCategoriesOpen && (
-                  <div className="absolute top-full left-0 mt-3 w-96 bg-white backdrop-blur-xl rounded-3xl shadow-2xl border border-emerald-100 py-3 z-50 max-h-96 overflow-y-auto animate-fadeIn">
-                    {categories.map((cat) => (
-                      <div
-                        key={cat.id}
-                        className="transform transition-all duration-200 hover:translate-x-2"
-                      >
-                        <Link
-                          to={cat.link}
-                          className="flex items-center gap-4 px-6 py-4 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-transparent text-gray-700 hover:text-emerald-700 transition-all border-b border-gray-100 last:border-b-0"
-                          onClick={() => setIsCategoriesOpen(false)}
-                        >
-                          <div className={`w-1.5 h-12 rounded-full bg-gradient-to-b ${cat.colorClass} shadow-lg`} />
-                          <div>
-                            <div className="font-bold text-lg">{cat.name}</div>
-                            <div className="text-sm text-gray-500">{cat.desc}</div>
-                          </div>
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {isAuthenticated ? (
-                <>
-                  <button 
-                    onClick={handleDashboardClick} 
-                    className="text-gray-700 hover:text-emerald-700 font-semibold relative group transform transition-transform duration-200 hover:-translate-y-1"
-                  >
-                    Dashboard
-                    <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-600 transition-all group-hover:w-full"></span>
-                  </button>
-                  <button 
-                    onClick={handleLogout} 
-                    className="text-red-600 hover:text-red-700 font-semibold relative group transform transition-transform duration-200 hover:-translate-y-1"
-                  >
-                    Déconnexion
-                    <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 transition-all group-hover:w-full"></span>
-                  </button>
-                </>
-              ) : (
-                <div className="transform transition-transform duration-200 hover:-translate-y-1">
-                  <Link to="/login" className="text-gray-700 hover:text-emerald-700 font-semibold relative group">
-                    Connexion
-                    <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-600 transition-all group-hover:w-full"></span>
-                  </Link>
-                </div>
-              )}
-            </nav>
-
-            {/* Boutons d'action */}
-            <div className="flex gap-3">
-              {isAuthenticated ? (
-                <button
-                  onClick={handleDashboardClick}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-3 rounded-2xl hover:from-emerald-700 hover:to-teal-700 transition-all font-bold shadow-xl transform hover:scale-105 active:scale-95"
-                >
-                  Mon espace
-                </button>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="px-6 py-3 border-2 border-emerald-600 text-emerald-700 rounded-2xl hover:bg-emerald-50 transition-all font-semibold shadow-md hover:shadow-xl transform hover:scale-105 active:scale-95"
-                  >
-                    Se connecter
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-3 rounded-2xl hover:from-emerald-700 hover:to-teal-700 transition-all font-bold shadow-xl transform hover:scale-105 active:scale-95"
-                  >
-                    S'inscrire
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* Hero avec image de fond et texte à gauche */}
       <section
@@ -449,47 +290,6 @@ function Home() {
               ))}
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* 99 Noms - version sans numérotation et sans lien "Explorer" */}
-      <section className="py-32 bg-gradient-to-br from-emerald-900/5 via-white to-emerald-900/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20 animate-fadeInUp">
-            <h3 className="text-4xl md:text-5xl font-black mb-6">
-              <span className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                Les 99 Plus Beaux Noms
-              </span>
-              <br />
-              <span className="text-3xl md:text-4xl text-emerald-800">d'Allah ﷻ</span>
-            </h3>
-            <p className="text-xl text-gray-700 max-w-3xl mx-auto mb-8 font-serif italic">
-              "Celui qui les mémorise entrera au Paradis"
-            </p>
-          </div>
-
-          {/* Grille - sans numérotation */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 max-h-96 overflow-y-auto p-6 bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-emerald-100">
-            {nomsAllah.map((nom, idx) => (
-              <div
-                key={idx}
-                onMouseEnter={() => setHoveredNom(idx)}
-                onMouseLeave={() => setHoveredNom(null)}
-                onClick={() => toast.info(
-                  <div>
-                    <div className="font-bold">Ya {nom}</div>
-                    <div className="text-sm text-emerald-600">Béni soit ce Nom</div>
-                  </div>, 
-                  { theme: "colored" }
-                )}
-                className={`p-3 bg-white hover:bg-gradient-to-br hover:from-emerald-50 hover:to-teal-50 border border-emerald-100 hover:border-emerald-300 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all duration-300 text-center font-medium text-gray-700 hover:text-emerald-700 text-xs min-h-[60px] flex items-center justify-center transform ${hoveredNom === idx ? 'scale-105 -translate-y-1' : ''}`}
-              >
-                {nom}
-              </div>
-            ))}
-          </div>
-
-          {/* Lien "Explorer tous les noms" supprimé */}
         </div>
       </section>
 

@@ -68,6 +68,7 @@ const coursSchema = new mongoose.Schema({
   niveau: {
     type: String,
     enum: ['Débutant', 'Intermédiaire', 'Avancé', 'Expert'],
+    
     required: [true, 'Le niveau est obligatoire']
   },
   langue: {

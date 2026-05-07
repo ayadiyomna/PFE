@@ -1,6 +1,7 @@
 const Quiz = require('../models/Quiz');
 const User = require('../models/User');
 const Cours = require('../models/Cours');
+const QuizResult = require('../models/QuizResult');
 
 /**
  * Récupérer l'historique des quiz d'un étudiant
@@ -11,9 +12,9 @@ const getQuizHistory = async (req, res) => {
     
     const quizResults = await QuizResult.find({ utilisateur: userId })
       .populate('quiz')
-      .sort('-completedAt');
+      .sort('-completedAt') || [];
     
-    const formattedResults = quizResults.map(result => ({
+    const formattedResults = (quizResults || []).map(result => ({
       id: result._id,
       title: result.quiz?.titre || 'Quiz',
       module: result.quiz?.module || 'Général',
@@ -22,7 +23,7 @@ const getQuizHistory = async (req, res) => {
       totalQuestions: result.totalQuestions,
       correctAnswers: result.correctAnswers,
       passed: result.score >= 70,
-      time: `${Math.floor(result.duration / 60)}min`
+      time: `${Math.floor((result.duration || 0) / 60)}min`
     }));
     
     res.json({
@@ -85,6 +86,10 @@ const submitQuiz = async (req, res) => {
   try {
     const { quizId, answers } = req.body;
     const userId = req.user._id;
+
+    // Debug info: log who is submitting and payload (helpful for reproducing 404/500)
+    console.log(`➡️ POST /api/quiz/submit - user: ${userId} - quizId: ${quizId}`);
+    console.log('Payload answers length:', Array.isArray(answers) ? answers.length : typeof answers);
     
     const quiz = await Quiz.findById(quizId);
     if (!quiz) {
@@ -128,10 +133,22 @@ const submitQuiz = async (req, res) => {
       message: passed ? 'Quiz réussi !' : 'Quiz terminé'
     });
   } catch (error) {
+    // Log full error server-side
     console.error('Erreur submitQuiz:', error);
-    res.status(500).json({
+
+    // Return more detailed error in development for easier debugging
+    if (process.env.NODE_ENV !== 'production') {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+        stack: error.stack
+      });
+    }
+
+    // In production, avoid leaking stack traces
+    return res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Erreur interne du serveur'
     });
   }
 };
