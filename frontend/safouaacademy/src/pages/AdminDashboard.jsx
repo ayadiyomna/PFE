@@ -18,7 +18,10 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [deleteCourseId, setDeleteCourseId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [formData, setFormData] = useState({ nom: "", prenom: "", email: "", role: "etudiant", password: "" });
   const [courseForm, setCourseForm] = useState({
     titre: "",
     description: "",
@@ -29,18 +32,20 @@ function AdminDashboard() {
     status: "Brouillon",
     dureeTotale: ""
   });
-  const [editingCourse, setEditingCourse] = useState(null);
-  const [deleteCourseId, setDeleteCourseId] = useState(null);
-  const [formData, setFormData] = useState({ 
-    nom: "", 
-    prenom: "",
-    email: "", 
-    role: "etudiant",
-    password: ""
-  });
   const [operationLoading, setOperationLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [contactRequests, setContactRequests] = useState([]);
+
+  const loadContactRequests = async () => {
+    try {
+      const res = await api.get('/notifications/requests');
+      setContactRequests(res.data?.data || res.data || []);
+    } catch (err) {
+      console.error('Erreur chargement demandes:', err);
+      setContactRequests([]);
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -98,6 +103,7 @@ function AdminDashboard() {
           setIsAuthorized(true);
           loadUsers();
           loadCourses();
+              loadContactRequests();
         } else {
           console.error("❌ User role not admin:", user?.role);
           navigate("/");
@@ -742,6 +748,43 @@ function AdminDashboard() {
                   </div>
                 ))}
               </div>
+            </section>
+          )}
+
+          {activeTab === "demandes" && (
+            <section className="bg-white rounded-3xl p-6 shadow-sm border border-emerald-100">
+              <h3 className="text-lg font-bold text-slate-900 mb-4">Demandes envoyées par les enseignants</h3>
+              {contactRequests.length === 0 ? (
+                <p className="text-slate-500">Aucune demande pour le moment.</p>
+              ) : (
+                <div className="space-y-3">
+                  {contactRequests.map((reqItem) => (
+                    <div key={reqItem._id} className="p-4 border rounded-xl">
+                      <div className="flex justify-between items-start gap-3">
+                        <div>
+                          <h4 className="font-semibold text-slate-900">{reqItem.title}</h4>
+                          <p className="text-xs text-slate-500">Envoyé: {new Date(reqItem.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!reqItem.read && (
+                            <button onClick={async () => {
+                              try {
+                                await api.patch(`/notifications/${reqItem._id}/read`);
+                                loadContactRequests();
+                                showMessage('Marqué comme lu');
+                              } catch (err) {
+                                console.error('Erreur mark read:', err);
+                                showMessage('Erreur', true);
+                              }
+                            }} className="px-3 py-1 text-xs bg-emerald-600 text-white rounded">Marquer lu</button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-3 text-sm text-slate-700 whitespace-pre-wrap">{reqItem.message}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 

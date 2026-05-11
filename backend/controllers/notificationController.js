@@ -81,3 +81,58 @@ module.exports = {
   markAsRead,
   markAllAsRead
 };
+
+// Liste des demandes (notifications de type 'message') pour les administrateurs
+module.exports.getContactRequests = async (req, res) => {
+  try {
+    const Notification = require('../models/Notification');
+    const requests = await Notification.find({ type: 'message' }).sort('-createdAt');
+    res.json({ success: true, data: requests });
+  } catch (error) {
+    console.error('Erreur getContactRequests:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Créer une demande de contact / requête vers l'admin (depuis un enseignant)
+ * Cette route crée une notification pour chaque administrateur
+ */
+const createContactRequest = async (req, res) => {
+  try {
+    const { subject, message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Le message est requis' });
+    }
+
+    const User = require('../models/User');
+    const admins = await User.find({ role: 'administrateur' });
+
+    if (!admins || admins.length === 0) {
+      return res.status(404).json({ success: false, message: 'Aucun administrateur trouvé' });
+    }
+
+    const fromUser = req.user;
+    const title = subject && subject.trim() ? `Demande: ${subject.trim()}` : 'Demande de création de cours';
+    const fullMessage = `${fromUser.prenom || ''} ${fromUser.nom || ''} <${fromUser.email}>\n\n${message}`;
+
+    const created = [];
+    for (const admin of admins) {
+      const n = await Notification.create({
+        utilisateur: admin._id,
+        type: 'message',
+        title,
+        message: fullMessage,
+        data: { from: fromUser._id, fromEmail: fromUser.email }
+      });
+      created.push(n);
+    }
+
+    res.status(201).json({ success: true, data: created, message: 'Demande envoyée aux administrateurs' });
+  } catch (error) {
+    console.error('Erreur createContactRequest:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports.createContactRequest = createContactRequest;

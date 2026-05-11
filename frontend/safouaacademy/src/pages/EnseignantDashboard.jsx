@@ -21,6 +21,12 @@ function EnseignantDashboard() {
   const [user, setUser] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactSubject, setContactSubject] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactResult, setContactResult] = useState(null);
+  const [selectedCourseIdForStats, setSelectedCourseIdForStats] = useState(null);
 
   useEffect(() => {
     const userData = authService.getCurrentUser();
@@ -106,7 +112,8 @@ function EnseignantDashboard() {
   };
 
   const handleViewStats = (courseId) => {
-    navigate(`/enseignant/statistiques/${courseId}`);
+    setSelectedCourseIdForStats(courseId);
+    setActiveTab("analytiques");
   };
 
   const handleViewCourse = (courseId) => {
@@ -258,9 +265,7 @@ function EnseignantDashboard() {
               })}
             </p>
           </div>
-          <button onClick={handleCreateCourse} className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition font-semibold flex items-center gap-2 shadow-lg">
-            <span className="text-xl">+</span> Créer un cours
-          </button>
+          {/* Le bouton "+ Créer un cours" a été retiré pour les enseignants; création gérée via l'administration */}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
@@ -292,6 +297,74 @@ function EnseignantDashboard() {
           </div>
         ) : (
           <>
+            {activeTab === "analytiques" && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">Analytiques des cours</h2>
+                {selectedCourseIdForStats ? (
+                  <div className="space-y-6">
+                    {courses.find((c) => c._id === selectedCourseIdForStats) && (
+                      <>
+                        <div className="mb-4 pb-4 border-b border-gray-200">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {courses.find((c) => c._id === selectedCourseIdForStats)?.titre}
+                          </h3>
+                          <button
+                            onClick={() => setSelectedCourseIdForStats(null)}
+                            className="mt-2 text-sm text-emerald-600 hover:underline"
+                          >
+                            ← Voir tous les cours
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                            <p className="text-sm text-gray-600">Étudiants inscrits</p>
+                            <p className="text-3xl font-bold text-emerald-600 mt-2">
+                              {courses.find((c) => c._id === selectedCourseIdForStats)?.students?.length || 0}
+                            </p>
+                          </div>
+                          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                            <p className="text-sm text-gray-600">Progression moyenne</p>
+                            <p className="text-3xl font-bold text-blue-600 mt-2">
+                              {courses.find((c) => c._id === selectedCourseIdForStats)?.progress || 0}%
+                            </p>
+                          </div>
+                          <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                            <p className="text-sm text-gray-600">Évaluation</p>
+                            <p className="text-3xl font-bold text-amber-600 mt-2">
+                              {courses.find((c) => c._id === selectedCourseIdForStats)?.rating || "N/A"}
+                            </p>
+                          </div>
+                          <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                            <p className="text-sm text-gray-600">Prix (DT)</p>
+                            <p className="text-3xl font-bold text-purple-600 mt-2">
+                              {courses.find((c) => c._id === selectedCourseIdForStats)?.prix || 0}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-6 bg-gray-50 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-900 mb-3">Statistiques détaillées</h4>
+                          <div className="space-y-2 text-sm text-gray-700">
+                            <p><span className="font-semibold">Statut:</span> {courses.find((c) => c._id === selectedCourseIdForStats)?.status || "Brouillon"}</p>
+                            <p><span className="font-semibold">Catégorie:</span> {courses.find((c) => c._id === selectedCourseIdForStats)?.categorie || "Non spécifiée"}</p>
+                            <p><span className="font-semibold">Niveau:</span> {courses.find((c) => c._id === selectedCourseIdForStats)?.niveau || "Non spécifié"}</p>
+                            <p><span className="font-semibold">Modules:</span> {courses.find((c) => c._id === selectedCourseIdForStats)?.modules?.length || 0}</p>
+                            <p><span className="font-semibold">Date de création:</span> {new Date(courses.find((c) => c._id === selectedCourseIdForStats)?.createdAt).toLocaleDateString("fr-FR")}</p>
+                            <p><span className="font-semibold">Dernière mise à jour:</span> {new Date(courses.find((c) => c._id === selectedCourseIdForStats)?.updatedAt).toLocaleDateString("fr-FR")}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
+                    <span className="text-6xl mb-4 block">📊</span>
+                    <p className="text-gray-500 mb-4">Sélectionnez un cours pour voir ses statistiques</p>
+                    <p className="text-sm text-gray-400">Cliquez sur le bouton 📊 à côté d'un cours pour afficher ses analytiques</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === "cours" && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Mes cours</h2>
@@ -302,7 +375,7 @@ function EnseignantDashboard() {
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold text-gray-900 cursor-pointer hover:text-emerald-600" onClick={() => handleViewCourse(course._id)}>
+                              <h3 className="font-semibold text-gray-900 cursor-pointer hover:text-emerald-600" onClick={() => handleEditCourse(course._id)}>
                                 {course.titre}
                               </h3>
                               <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -325,14 +398,6 @@ function EnseignantDashboard() {
                           <div className="flex items-center gap-2">
                             <button onClick={() => handleViewStats(course._id)} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition" title="Statistiques">📊</button>
                             <button onClick={() => handleEditCourse(course._id)} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition" title="Modifier">✏️</button>
-                            {course.status === "Brouillon" && (
-                              <button onClick={() => handlePublishCourse(course._id)} className="p-2 border border-green-200 text-green-700 rounded-lg hover:bg-green-50 transition" title="Publier">📢</button>
-                            )}
-                            {course.status === "Publié" && (
-                              <button onClick={() => handleArchiveCourse(course._id)} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition" title="Archiver">📦</button>
-                            )}
-                            <button onClick={() => handleDuplicateCourse(course)} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition" title="Dupliquer">📋</button>
-                            <button onClick={() => handleDeleteCourse(course._id)} className="p-2 border border-red-200 text-red-700 rounded-lg hover:bg-red-50 transition" title="Supprimer">🗑️</button>
                           </div>
                         </div>
                         <div className="mt-3">
@@ -344,10 +409,114 @@ function EnseignantDashboard() {
                     ))}
                   </div>
                 ) : (
+                  <>
+                    <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
+                      <span className="text-6xl mb-4 block">📚</span>
+                      <p className="text-gray-500 mb-4">Vous n'avez pas encore de cours</p>
+                      <p className="text-sm text-slate-600 mb-3">La création de cours est gérée par l'administration. Si vous souhaitez créer un cours, contactez l'administrateur.</p>
+                      <button onClick={() => { setShowContactModal(true); setContactResult(null); }} className="text-emerald-600 font-semibold hover:underline">Contacter l'administrateur</button>
+                    </div>
+                    {showContactModal && (
+                      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+                          <h3 className="text-lg font-bold text-slate-900 mb-3">Demande à l'administrateur</h3>
+                          <p className="text-sm text-slate-500 mb-4">Remplissez le formulaire pour demander la création d'un cours ou toute autre aide.</p>
+                          {contactResult && (
+                            <div className={`mb-3 p-3 rounded ${contactResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{contactResult.message}</div>
+                          )}
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-sm font-semibold text-slate-700">Sujet</label>
+                              <input value={contactSubject} onChange={(e) => setContactSubject(e.target.value)} placeholder="Sujet (ex: Demande création cours)" className="w-full px-3 py-2 mt-1 border rounded" />
+                            </div>
+                            <div>
+                              <label className="text-sm font-semibold text-slate-700">Message *</label>
+                              <textarea value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} rows={6} placeholder="Décrivez votre demande" className="w-full px-3 py-2 mt-1 border rounded" />
+                            </div>
+                          </div>
+                          <div className="flex gap-3 mt-4">
+                            <button disabled={contactLoading} onClick={async () => {
+                              if (!contactMessage.trim()) { setContactResult({ success: false, message: 'Le message est requis' }); return; }
+                              try {
+                                setContactLoading(true);
+                                const payload = { subject: contactSubject, message: contactMessage };
+                                const res = await api.post('/notifications/contact', payload);
+                                setContactResult({ success: true, message: res.data?.message || 'Demande envoyée' });
+                                setContactSubject(''); setContactMessage('');
+                                setTimeout(() => setShowContactModal(false), 1200);
+                              } catch (err) {
+                                setContactResult({ success: false, message: err.response?.data?.message || err.message || 'Erreur envoi' });
+                              } finally { setContactLoading(false); }
+                            }} className="flex-1 bg-emerald-600 text-white py-2 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50">{contactLoading ? 'Envoi...' : 'Envoyer la demande'}</button>
+                            <button disabled={contactLoading} onClick={() => setShowContactModal(false)} className="flex-1 border border-slate-200 py-2 rounded-xl font-semibold hover:bg-slate-50">Annuler</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === "etudiants" && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">Étudiants inscrits</h2>
+                {courses.length > 0 ? (
+                  <div className="space-y-6">
+                    {courses.map((course) => (
+                      <div key={course._id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="mb-4 pb-3 border-b border-gray-100">
+                          <h3 className="text-lg font-semibold text-gray-900">{course.titre}</h3>
+                          <p className="text-sm text-gray-600">
+                            {course.students?.length || 0} étudiant{(course.students?.length || 0) > 1 ? 's' : ''} inscrit{(course.students?.length || 0) > 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        {course.students && course.students.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-gray-200">
+                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Nom</th>
+                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Email</th>
+                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Date inscription</th>
+                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Progression</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {course.students.map((student, idx) => (
+                                  <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="py-3 px-3">
+                                      <span className="font-medium text-gray-900">
+                                        {student.prenom} {student.nom}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 text-gray-600">{student.email}</td>
+                                    <td className="py-3 px-3 text-gray-600">
+                                      {student.createdAt ? new Date(student.createdAt).toLocaleDateString("fr-FR") : "N/A"}
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                          <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${student.progress || 0}%` }}></div>
+                                        </div>
+                                        <span className="text-xs font-semibold text-gray-700">{student.progress || 0}%</span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-center py-4">Aucun étudiant inscrit à ce cours</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                   <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
-                    <span className="text-6xl mb-4 block">📚</span>
-                    <p className="text-gray-500 mb-4">Vous n'avez pas encore de cours</p>
-                    <button onClick={handleCreateCourse} className="text-emerald-600 font-semibold hover:underline">Créer votre premier cours</button>
+                    <span className="text-6xl mb-4 block">👥</span>
+                    <p className="text-gray-500">Vous n'avez pas de cours avec des étudiants</p>
                   </div>
                 )}
               </div>

@@ -2,12 +2,16 @@ const express = require("express");
 const router = express.Router(); // <--- Cette ligne manquait probablement
 const Stripe = require("stripe");
 
-// Vérifier la présence d'une clé Stripe valide dans l'environnement
+// Environment / dev helpers
 const stripeKey = process.env.STRIPE_SECRET_KEY || "";
+const isDev = process.env.NODE_ENV !== "production";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5175";
+const USE_DEV_PAYMENT_MOCK = (process.env.USE_DEV_PAYMENT_MOCK || "false").toLowerCase() === "true";
+
 let stripe = null;
 if (!stripeKey || stripeKey.includes("votre_cle") || stripeKey.trim() === "") {
-  console.error(
-    "⚠️ STRIPE_SECRET_KEY non configurée ou contient un placeholder. Définissez une clé Stripe valide dans .env"
+  console.warn(
+    "⚠️ STRIPE_SECRET_KEY non configurée ou contient un placeholder. Vous pouvez activer le mock en dev en définissant USE_DEV_PAYMENT_MOCK=true"
   );
 } else {
   stripe = new Stripe(stripeKey);
@@ -15,12 +19,22 @@ if (!stripeKey || stripeKey.includes("votre_cle") || stripeKey.trim() === "") {
 
 router.post("/create-checkout-session", async (req, res) => {
   const { course } = req.body;
-  if (!stripe) {
-    return res.status(500).json({ error: "Stripe non configuré sur le serveur" });
-  }
 
+  // Basic validation
   if (!course || course.prix === undefined) {
     return res.status(400).json({ error: "Données du cours incomplètes" });
+  }
+
+  // Dev-only mock: return a local frontend success URL when Stripe is not configured
+  // or when explicitly requested via USE_DEV_PAYMENT_MOCK=true
+  if (isDev && (USE_DEV_PAYMENT_MOCK || !stripe)) {
+    console.log("Using dev payment mock for course", course.titre || course._id);
+    // return a URL that mimics Stripe redirect to success page
+    return res.json({ url: `${FRONTEND_URL}/success?mock_checkout=true` });
+  }
+
+  if (!stripe) {
+    return res.status(500).json({ error: "Stripe non configuré sur le serveur" });
   }
 
   try {
@@ -46,8 +60,8 @@ router.post("/create-checkout-session", async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: "http://localhost:5173/success?session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: "http://localhost:5173/cancel",
+      success_url: `${FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}/cancel`,
     });
 
     res.json({ url: session.url });

@@ -23,6 +23,7 @@ import LessonPlayer from "./pages/LessonPlayer";
 import ProgressQuizPage from "./pages/ProgressQuizPage";
 import CertificatesPage from "./pages/CertificatesPage";
 import CreerCours from './components/CreerCours';
+import EnseignantCourseEditor from './pages/EnseignantCourseEditor';
 import ChatWidget from './components/ChatWidget';
 import Success from "./pages/Success";
 import Cancel from "./pages/Cancel";
@@ -241,7 +242,7 @@ function App() {
             } />
             <Route path="/enseignant/modifier-cours/:id" element={
               <ProtectedRoute allowedRoles={['enseignant', 'admin']}>
-                <CreerCours isEditing={true} />
+                <EnseignantCourseEditor />
               </ProtectedRoute>
             } />
             <Route path="/enseignant/statistiques/:courseId" element={

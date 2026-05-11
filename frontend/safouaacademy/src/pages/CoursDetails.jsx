@@ -133,7 +133,8 @@ function CourseDetail() {
       }
     } catch (error) {
       console.error("Payment Error:", error);
-      setCheckoutError(error?.message || "Erreur serveur pendant le paiement.");
+      const serverMessage = error?.response?.data?.error || error?.response?.data?.message;
+      setCheckoutError(serverMessage || error?.message || "Erreur serveur pendant le paiement.");
     } finally {
       setCheckoutLoading(false);
     }
