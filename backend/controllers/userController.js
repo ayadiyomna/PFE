@@ -457,12 +457,127 @@ const approuverEnseignant = async (req, res) => {
   }
 };
 
+// UPDATE PROFILE (utilisateur met à jour son propre profil)
+const updateProfile = async (req, res) => {
+  try {
+    const { nom, prenom, email, currentPassword, newPassword } = req.body;
+    const userId = req.user.id || req.user._id;
+
+    const user = await User.findById(userId).select("+mdp");
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Utilisateur non trouvé"
+      });
+    }
+
+    // Si on veut changer le mot de passe
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Le mot de passe actuel est requis pour changer le mot de passe"
+        });
+      }
+
+      // Vérifier le mot de passe actuel
+      const isPasswordMatch = await user.comparePassword(currentPassword);
+      if (!isPasswordMatch) {
+        return res.status(401).json({
+          success: false,
+          message: "Le mot de passe actuel est incorrect"
+        });
+      }
+
+      // Définir le nouveau mot de passe
+      user.mdp = newPassword;
+    }
+
+    // Mettre à jour les champs
+    if (nom) user.nom = nom.trim();
+    if (prenom) user.prenom = prenom.trim();
+    
+    // Vérifier si l'email n'existe pas ailleurs
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: "Cet email est déjà utilisé"
+        });
+      }
+      user.email = email.toLowerCase();
+    }
+
+    // Sauvegarder les modifications
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Profil mis à jour avec succès",
+      data: user.getPublicProfile()
+    });
+  } catch (error) {
+    console.error("❌ Erreur updateProfile:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erreur lors de la mise à jour du profil"
+    });
+  }
+};
+
+// UPDATE PROFILE PICTURE
+const updateProfilePicture = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Aucune image fournie"
+      });
+    }
+
+    const userId = req.user.id || req.user._id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Utilisateur non trouvé"
+      });
+    }
+
+    // Chemin relatif du fichier
+    const imagePath = `/uploads/profile/${req.file.filename}`;
+    user.image = imagePath;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Photo de profil mise à jour avec succès",
+      data: {
+        image: user.image,
+        profile: user.getPublicProfile()
+      }
+    });
+  } catch (error) {
+    console.error("❌ Erreur updateProfilePicture:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erreur lors de la mise à jour de la photo"
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   forgotPassword,
   resetPassword,
   getProfile,
+  updateProfile,
+  updateProfilePicture,
   listerutilisateurs,
   getutilisateurById,
   updateutilisateur,

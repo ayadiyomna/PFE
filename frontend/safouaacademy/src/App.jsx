@@ -27,6 +27,7 @@ import EnseignantCourseEditor from './pages/EnseignantCourseEditor';
 import ChatWidget from './components/ChatWidget';
 import Success from "./pages/Success";
 import Cancel from "./pages/Cancel";
+import Compte from "./pages/Compte";
 
 // Composant de route protégée (amélioré pour accepter admin et administrateur)
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -194,6 +195,11 @@ function App() {
             <Route path="/etudiant" element={
               <ProtectedRoute allowedRoles={['etudiant', 'admin']}>
                 <EtudiantDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/compte" element={
+              <ProtectedRoute>
+                <Compte />
               </ProtectedRoute>
             } />
             <Route path="/etudiant/progression" element={

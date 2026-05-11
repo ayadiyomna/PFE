@@ -129,13 +129,102 @@ router.get('/admin/courslist', protect, authorizeRoles('admin', 'administrateur'
 
 router.get('/enseignant/mes-cours', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
   try {
-    const cours = await Cours.find({ instructeur: req.user._id }).sort('-createdAt');
+    const cours = await Cours.find({ instructeur: req.user._id })
+      .populate('students', 'nom prenom email createdAt')
+      .sort('-createdAt');
     res.json({ success: true, data: cours });
   } catch (error) {
     console.error('Erreur dans /enseignant/mes-cours:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération des cours'
+    });
+  }
+});
+
+router.get('/enseignant/:courseId/etudiants', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
+  try {
+    // Validation de l'ID du cours
+    if (!req.params.courseId || req.params.courseId === 'undefined') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID du cours invalide'
+      });
+    }
+
+    const cours = await Cours.findById(req.params.courseId);
+
+    if (!cours) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cours non trouvé'
+      });
+    }
+
+    // Vérifier si l'utilisateur est l'instructeur ou un admin
+    const instructeurId = cours.instructeur?.toString ? cours.instructeur.toString() : cours.instructeur;
+    const userId = req.user._id?.toString ? req.user._id.toString() : req.user._id;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'administrateur';
+
+    if (instructeurId !== userId && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'êtes pas autorisé à voir les étudiants de ce cours'
+      });
+    }
+
+    // Récupérer la progression de chaque étudiant
+    const studentsWithProgress = await Promise.all(
+      (cours.students || []).map(async (studentId) => {
+        try {
+          // Récupérer les infos de l'étudiant
+          const student = await User.findById(studentId).select('nom prenom email');
+          const progress = await Progress.findOne({ 
+            utilisateur: studentId, 
+            cours: req.params.courseId 
+          });
+          
+          return {
+            _id: student?._id,
+            nom: student?.nom || '',
+            prenom: student?.prenom || '',
+            email: student?.email || '',
+            dateInscription: new Date(),
+            progression: progress?.progress || 0,
+            leçonsCompletées: progress?.completedLessons?.length || 0,
+            note: progress?.averageScore || 0
+          };
+        } catch (err) {
+          console.error('Erreur récupération données étudiant:', err);
+          return {
+            _id: studentId,
+            nom: 'Inconnu',
+            prenom: '',
+            email: 'N/A',
+            dateInscription: new Date(),
+            progression: 0,
+            leçonsCompletées: 0,
+            note: 0
+          };
+        }
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        coursId: cours._id,
+        coursTitre: cours.titre || 'Sans titre',
+        nombreEtudiants: studentsWithProgress.length,
+        etudiants: studentsWithProgress
+      }
+    });
+  } catch (error) {
+    console.error('Erreur dans GET /enseignant/:courseId/etudiants:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des étudiants',
+      error: error.message
     });
   }
 });

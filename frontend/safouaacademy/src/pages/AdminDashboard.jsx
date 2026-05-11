@@ -562,37 +562,7 @@ function AdminDashboard() {
                 ))}
               </section>
 
-              <section className="bg-white rounded-3xl p-6 shadow-sm border border-emerald-100">
-                <h3 className="text-lg font-bold text-slate-900 mb-5">Créer un espace de cours</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input name="titre" value={courseForm.titre} onChange={handleCourseFormChange} placeholder="Titre du cours" className="px-4 py-3 border border-slate-200 rounded-xl" />
-                  <input name="categorie" value={courseForm.categorie} onChange={handleCourseFormChange} placeholder="Catégorie" className="px-4 py-3 border border-slate-200 rounded-xl" />
-                  <select name="niveau" value={courseForm.niveau} onChange={handleCourseFormChange} className="px-4 py-3 border border-slate-200 rounded-xl">
-                    <option value="">-- Niveau --</option>
-                    {VALID_NIVEAUX.map((niveau) => (
-                      <option key={niveau} value={niveau}>{niveau}</option>
-                    ))}
-                  </select>
-                  <input name="prix" type="number" value={courseForm.prix} onChange={handleCourseFormChange} placeholder="Prix" className="px-4 py-3 border border-slate-200 rounded-xl" />
-                  <select name="instructeur" value={courseForm.instructeur} onChange={handleCourseFormChange} className="px-4 py-3 border border-slate-200 rounded-xl">
-                    <option value="">Choisir un enseignant</option>
-                    {users.filter((u) => u.role === "enseignant" || u.role === "teacher").map((u) => (
-                      <option key={u._id || u.id} value={u._id || u.id}>{u.prenom} {u.nom}</option>
-                    ))}
-                  </select>
-                  <select name="status" value={courseForm.status} onChange={handleCourseFormChange} className="px-4 py-3 border border-slate-200 rounded-xl">
-                    {VALID_STATUS.map((status) => (
-                      <option key={status} value={status}>{status}</option>
-                    ))}
-                  </select>
-                  <textarea name="description" value={courseForm.description} onChange={handleCourseFormChange} placeholder="Description" className="md:col-span-2 px-4 py-3 border border-slate-200 rounded-xl min-h-[120px]"></textarea>
-                </div>
-                <div className="mt-4">
-                  <button onClick={handleCreateCourse} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-emerald-700">
-                    Créer l’espace
-                  </button>
-                </div>
-              </section>
+              {/* Le formulaire 'Créer un espace de cours' a été supprimé */}
             </>
           )}
 

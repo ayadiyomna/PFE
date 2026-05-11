@@ -27,11 +27,25 @@ function EnseignantDashboard() {
   const [contactLoading, setContactLoading] = useState(false);
   const [contactResult, setContactResult] = useState(null);
   const [selectedCourseIdForStats, setSelectedCourseIdForStats] = useState(null);
+  const [studentsData, setStudentsData] = useState({});
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [selectedCourseForStudents, setSelectedCourseForStudents] = useState(null);
+  const [accountFormData, setAccountFormData] = useState({ nom: "", prenom: "", email: "" });
+  const [passwordFormData, setPasswordFormData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [accountMessage, setAccountMessage] = useState(null);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
     const userData = authService.getCurrentUser();
     if (userData) {
       setUser(userData);
+      setAccountFormData({
+        nom: userData.nom || "",
+        prenom: userData.prenom || "",
+        email: userData.email || ""
+      });
     } else {
       navigate("/login");
     }
@@ -185,6 +199,182 @@ function EnseignantDashboard() {
     }
   };
 
+  const loadCourseStudents = async (courseId) => {
+    try {
+      setLoadingStudents(true);
+      const response = await api.get(`/cours/enseignant/${courseId}/etudiants`);
+      if (response.data.success) {
+        setStudentsData(response.data.data);
+        setSelectedCourseForStudents(courseId);
+      } else {
+        console.error("Erreur chargement étudiants:", response.data);
+        alert("Erreur: " + (response.data.message || "Impossible de charger les étudiants"));
+      }
+    } catch (error) {
+      console.error("Erreur chargement étudiants:", error);
+      console.error("Status:", error.response?.status);
+      console.error("Data:", error.response?.data);
+      alert("Erreur: " + (error.response?.data?.message || error.message || "Erreur serveur"));
+      setStudentsData(null);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  const handleExportStudentsCSV = () => {
+    if (!studentsData || !studentsData.etudiants) return;
+
+    const headers = ['Nom', 'Prénom', 'Email', 'Date d\'inscription', 'Progression (%)', 'Leçons complétées', 'Note'];
+    const rows = studentsData.etudiants.map(student => [
+      student.nom,
+      student.prenom,
+      student.email,
+      new Date(student.dateInscription).toLocaleDateString('fr-FR'),
+      student.progression,
+      student.leçonsCompletées,
+      student.note
+    ]);
+
+    let csvContent = headers.join(',') + '\n';
+    rows.forEach(row => {
+      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+    });
+
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+    element.setAttribute('download', `etudiants_${studentsData.coursTitre}_${new Date().getTime()}.csv`);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleAccountInputChange = (e) => {
+    const { name, value } = e.target;
+    setAccountFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handlePasswordInputChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleUpdateAccount = async (e) => {
+    e.preventDefault();
+    setAccountMessage(null);
+
+    if (!accountFormData.nom.trim() || !accountFormData.prenom.trim() || !accountFormData.email.trim()) {
+      setAccountMessage({ type: 'error', text: 'Nom, prénom et email sont requis.' });
+      return;
+    }
+
+    try {
+      setAccountLoading(true);
+      const response = await api.put('/users/profile', {
+        nom: accountFormData.nom,
+        prenom: accountFormData.prenom,
+        email: accountFormData.email
+      });
+
+      if (response.data.success) {
+        setUser(response.data.data);
+        authService.setSession({ token: localStorage.getItem('token'), user: response.data.data });
+        setAccountFormData({
+          nom: response.data.data.nom || '',
+          prenom: response.data.data.prenom || '',
+          email: response.data.data.email || ''
+        });
+        setAccountMessage({ type: 'success', text: response.data.message || 'Profil mis à jour avec succès.' });
+      }
+    } catch (error) {
+      console.error('Erreur mise à jour compte:', error);
+      setAccountMessage({ type: 'error', text: error.response?.data?.message || error.message || 'Impossible de mettre à jour le profil.' });
+    } finally {
+      setAccountLoading(false);
+      setTimeout(() => setAccountMessage(null), 4000);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setAccountMessage(null);
+
+    if (!passwordFormData.currentPassword || !passwordFormData.newPassword || !passwordFormData.confirmPassword) {
+      setAccountMessage({ type: 'error', text: 'Tous les champs du mot de passe sont requis.' });
+      return;
+    }
+
+    if (passwordFormData.newPassword.length < 6) {
+      setAccountMessage({ type: 'error', text: 'Le nouveau mot de passe doit contenir au moins 6 caractères.' });
+      return;
+    }
+
+    if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
+      setAccountMessage({ type: 'error', text: 'Les mots de passe ne correspondent pas.' });
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      const response = await api.put('/users/profile', {
+        currentPassword: passwordFormData.currentPassword,
+        newPassword: passwordFormData.newPassword
+      });
+
+      if (response.data.success) {
+        setAccountMessage({ type: 'success', text: response.data.message || 'Mot de passe modifié avec succès.' });
+        setPasswordFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      }
+    } catch (error) {
+      console.error('Erreur changement mot de passe:', error);
+      setAccountMessage({ type: 'error', text: error.response?.data?.message || error.message || 'Impossible de changer le mot de passe.' });
+    } finally {
+      setPasswordLoading(false);
+      setTimeout(() => setAccountMessage(null), 4000);
+    }
+  };
+
+  const handleUploadProfileImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setAccountMessage({ type: 'error', text: 'Veuillez sélectionner une image valide.' });
+      return;
+    }
+
+    try {
+      setImageUploading(true);
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await api.post('/users/profile/picture', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success) {
+        const updatedProfile = response.data.data.profile || response.data.data;
+        setUser(updatedProfile);
+        authService.setSession({ token: localStorage.getItem('token'), user: updatedProfile });
+        setAccountMessage({ type: 'success', text: response.data.message || 'Photo de profil mise à jour.' });
+      }
+    } catch (error) {
+      console.error('Erreur upload image profile:', error);
+      setAccountMessage({ type: 'error', text: error.response?.data?.message || error.message || 'Erreur upload image.' });
+    } finally {
+      setImageUploading(false);
+      setTimeout(() => setAccountMessage(null), 4000);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {deleteModal && (
@@ -239,7 +429,7 @@ function EnseignantDashboard() {
               </span>
             </div>
 
-            <button onClick={() => navigate("/compte")} className="text-sm bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold">
+            <button onClick={() => setActiveTab("parametres")} className="text-sm bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold">
               Mon compte
             </button>
 
@@ -463,55 +653,114 @@ function EnseignantDashboard() {
                 <h2 className="text-xl font-bold text-gray-900 mb-6">Étudiants inscrits</h2>
                 {courses.length > 0 ? (
                   <div className="space-y-6">
-                    {courses.map((course) => (
-                      <div key={course._id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="mb-4 pb-3 border-b border-gray-100">
-                          <h3 className="text-lg font-semibold text-gray-900">{course.titre}</h3>
-                          <p className="text-sm text-gray-600">
-                            {course.students?.length || 0} étudiant{(course.students?.length || 0) > 1 ? 's' : ''} inscrit{(course.students?.length || 0) > 1 ? 's' : ''}
+                    {selectedCourseForStudents ? (
+                      <div>
+                        <div className="mb-6 pb-4 border-b border-gray-200">
+                          <h3 className="text-lg font-semibold text-gray-900">{studentsData?.coursTitre}</h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {studentsData?.nombreEtudiants} étudiant{studentsData?.nombreEtudiants > 1 ? 's' : ''} inscrit{studentsData?.nombreEtudiants > 1 ? 's' : ''}
                           </p>
+                          <button
+                            onClick={() => setSelectedCourseForStudents(null)}
+                            className="mt-3 text-sm text-emerald-600 hover:underline font-semibold"
+                          >
+                            ← Voir tous les cours
+                          </button>
                         </div>
-                        {course.students && course.students.length > 0 ? (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="border-b border-gray-200">
-                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Nom</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Email</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Date inscription</th>
-                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">Progression</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {course.students.map((student, idx) => (
-                                  <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="py-3 px-3">
-                                      <span className="font-medium text-gray-900">
-                                        {student.prenom} {student.nom}
-                                      </span>
-                                    </td>
-                                    <td className="py-3 px-3 text-gray-600">{student.email}</td>
-                                    <td className="py-3 px-3 text-gray-600">
-                                      {student.createdAt ? new Date(student.createdAt).toLocaleDateString("fr-FR") : "N/A"}
-                                    </td>
-                                    <td className="py-3 px-3">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                          <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${student.progress || 0}%` }}></div>
-                                        </div>
-                                        <span className="text-xs font-semibold text-gray-700">{student.progress || 0}%</span>
-                                      </div>
-                                    </td>
+
+                        {loadingStudents ? (
+                          <div className="flex justify-center py-8">
+                            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-emerald-600"></div>
+                          </div>
+                        ) : studentsData?.etudiants && studentsData.etudiants.length > 0 ? (
+                          <div>
+                            <div className="mb-4 flex justify-end">
+                              <button
+                                onClick={handleExportStudentsCSV}
+                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
+                              >
+                                📥 Exporter en CSV
+                              </button>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b border-gray-200 bg-gray-50">
+                                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Nom</th>
+                                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
+                                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Date inscription</th>
+                                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Progression</th>
+                                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Leçons</th>
+                                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Note</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody>
+                                  {studentsData.etudiants.map((student, idx) => (
+                                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                                      <td className="py-3 px-4">
+                                        <span className="font-medium text-gray-900">
+                                          {student.prenom} {student.nom}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 px-4 text-gray-600">{student.email}</td>
+                                      <td className="py-3 px-4 text-gray-600">
+                                        {new Date(student.dateInscription).toLocaleDateString("fr-FR")}
+                                      </td>
+                                      <td className="py-3 px-4">
+                                        <div className="flex items-center gap-2 justify-center">
+                                          <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div
+                                              className="h-full bg-emerald-600 rounded-full transition-all"
+                                              style={{ width: `${student.progression}%` }}
+                                            ></div>
+                                          </div>
+                                          <span className="text-xs font-semibold text-gray-700 w-10">
+                                            {student.progression}%
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className="py-3 px-4 text-center">
+                                        <span className="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold">
+                                          {student.leçonsCompletées}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 px-4 text-center">
+                                        <span className="inline-block text-xs font-semibold">
+                                          {student.note ? `${student.note.toFixed(1)}/20` : 'N/A'}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         ) : (
-                          <p className="text-gray-500 text-center py-4">Aucun étudiant inscrit à ce cours</p>
+                          <p className="text-gray-500 text-center py-6">Aucun étudiant inscrit à ce cours</p>
                         )}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="space-y-4">
+                        {courses.map((course) => (
+                          <div key={course._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="font-semibold text-gray-900">{course.titre}</h3>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {course.students?.length || 0} étudiant{(course.students?.length || 0) > 1 ? 's' : ''} inscrit{(course.students?.length || 0) > 1 ? 's' : ''}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => loadCourseStudents(course._id)}
+                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
+                              >
+                                Voir les détails →
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
@@ -521,6 +770,94 @@ function EnseignantDashboard() {
                 )}
               </div>
             )}
+
+            {activeTab === "parametres" && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">Paramètres du compte</h2>
+
+                {accountMessage && (
+                  <div className={`mb-4 p-3 rounded ${accountMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
+                    {accountMessage.text}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="md:col-span-1 bg-gray-50 p-4 rounded-lg flex flex-col items-center gap-4">
+                    <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center">
+                      {user?.image ? (
+                        <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.image}`} alt="Profil" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-4xl">👤</span>
+                      )}
+                    </div>
+
+                    <div className="w-full text-center">
+                      <input id="enseignant-profile-image" type="file" accept="image/*" onChange={handleUploadProfileImage} className="hidden" />
+                      <label htmlFor="enseignant-profile-image" className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${imageUploading ? 'bg-gray-200 text-gray-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
+                        {imageUploading ? 'Téléversement...' : 'Changer la photo'}
+                      </label>
+                      <p className="text-xs text-gray-500 mt-3">Format: JPG/PNG/GIF — Max 5MB</p>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <div className="bg-white p-4 rounded-lg border border-gray-100">
+                      <h3 className="text-lg font-semibold mb-4">Informations personnelles</h3>
+                      <form onSubmit={handleUpdateAccount} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm text-gray-600 mb-1">Nom</label>
+                            <input name="nom" value={accountFormData.nom} onChange={handleAccountInputChange} className="w-full px-3 py-2 border rounded" />
+                          </div>
+                          <div>
+                            <label className="block text-sm text-gray-600 mb-1">Prénom</label>
+                            <input name="prenom" value={accountFormData.prenom} onChange={handleAccountInputChange} className="w-full px-3 py-2 border rounded" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">Email</label>
+                          <input name="email" value={accountFormData.email} onChange={handleAccountInputChange} className="w-full px-3 py-2 border rounded" />
+                        </div>
+
+                        <div className="flex gap-3">
+                          <button disabled={accountLoading} type="submit" className={`px-4 py-2 rounded-lg font-semibold ${accountLoading ? 'bg-gray-200 text-gray-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
+                            {accountLoading ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-lg border border-gray-100 mt-6">
+                      <h3 className="text-lg font-semibold mb-4">Sécurité — changer le mot de passe</h3>
+                      <form onSubmit={handleChangePassword} className="space-y-4">
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">Mot de passe actuel</label>
+                          <input name="currentPassword" type="password" value={passwordFormData.currentPassword} onChange={handlePasswordInputChange} className="w-full px-3 py-2 border rounded" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm text-gray-600 mb-1">Nouveau mot de passe</label>
+                            <input name="newPassword" type="password" value={passwordFormData.newPassword} onChange={handlePasswordInputChange} className="w-full px-3 py-2 border rounded" />
+                          </div>
+                          <div>
+                            <label className="block text-sm text-gray-600 mb-1">Confirmer le mot de passe</label>
+                            <input name="confirmPassword" type="password" value={passwordFormData.confirmPassword} onChange={handlePasswordInputChange} className="w-full px-3 py-2 border rounded" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <button disabled={passwordLoading} type="submit" className={`px-4 py-2 rounded-lg font-semibold ${passwordLoading ? 'bg-gray-200 text-gray-700' : 'bg-amber-600 text-white hover:bg-amber-700'}`}>
+                            {passwordLoading ? 'Mise à jour...' : 'Modifier le mot de passe'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </>
         )}
       </main>
