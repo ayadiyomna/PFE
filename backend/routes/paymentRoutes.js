@@ -5,7 +5,9 @@ const Stripe = require("stripe");
 // Environment / dev helpers
 const stripeKey = process.env.STRIPE_SECRET_KEY || "";
 const isDev = process.env.NODE_ENV !== "production";
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5175";
+// Prefer explicit FRONTEND_URL, otherwise try to detect from request origin or default to common Vite port 5174
+const FRONTEND_URL = process.env.FRONTEND_URL || null;
+const FRONTEND_DEFAULT_PORT = process.env.FRONTEND_PORT || "5174";
 const USE_DEV_PAYMENT_MOCK = (process.env.USE_DEV_PAYMENT_MOCK || "false").toLowerCase() === "true";
 
 let stripe = null;
@@ -25,12 +27,15 @@ router.post("/create-checkout-session", async (req, res) => {
     return res.status(400).json({ error: "Données du cours incomplètes" });
   }
 
+  // Determine frontend base URL from env or request (safer in dev when ports vary)
+  const frontendBase = FRONTEND_URL || req.get('origin') || `http://localhost:${FRONTEND_DEFAULT_PORT}`;
+
   // Dev-only mock: return a local frontend success URL when Stripe is not configured
   // or when explicitly requested via USE_DEV_PAYMENT_MOCK=true
   if (isDev && (USE_DEV_PAYMENT_MOCK || !stripe)) {
-    console.log("Using dev payment mock for course", course.titre || course._id);
+    console.log("Using dev payment mock for course", course.titre || course._id, "->", frontendBase);
     // return a URL that mimics Stripe redirect to success page
-    return res.json({ url: `${FRONTEND_URL}/success?mock_checkout=true` });
+    return res.json({ url: `${frontendBase}/success?mock_checkout=true` });
   }
 
   if (!stripe) {
@@ -60,8 +65,8 @@ router.post("/create-checkout-session", async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: `${FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/cancel`,
+      success_url: `${frontendBase}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendBase}/cancel`,
     });
 
     res.json({ url: session.url });

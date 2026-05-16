@@ -127,6 +127,17 @@ router.get('/admin/courslist', protect, authorizeRoles('admin', 'administrateur'
   }
 });
 
+// Retourne la liste des catégories distinctes utilisées sur la plateforme
+router.get('/categories', async (req, res) => {
+  try {
+    const categories = await Cours.distinct('categorie');
+    res.json({ success: true, data: categories });
+  } catch (error) {
+    console.error('Erreur dans GET /categories:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la récupération des catégories', error: error.message });
+  }
+});
+
 router.get('/enseignant/mes-cours', protect, authorizeRoles('enseignant', 'admin', 'administrateur'), async (req, res) => {
   try {
     const cours = await Cours.find({ instructeur: req.user._id })

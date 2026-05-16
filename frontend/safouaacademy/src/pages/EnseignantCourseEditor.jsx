@@ -13,6 +13,7 @@ function EnseignantCourseEditor() {
   const [selectedModuleForLesson, setSelectedModuleForLesson] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState(null);
+  const [selectedStudentForCert, setSelectedStudentForCert] = useState("");
 
   const loadCourse = async () => {
     setLoading(true);
@@ -172,17 +173,21 @@ function EnseignantCourseEditor() {
     }
   };
 
-  const handleGenerateCertificat = async () => {
+  const handleGenerateCertificat = async (studentId) => {
+    // studentId param overrides select; otherwise use selectedStudentForCert
+    const utilisateur = studentId || selectedStudentForCert || null;
     try {
-      const res = await api.post(`/certificats/generer/${id}`);
+      const body = utilisateur ? { utilisateur } : {};
+      const res = await api.post(`/certificats/generer/${id}`, body);
       if (res.data?.success) {
         alert(res.data.message || 'Certificat généré');
       } else {
         alert(res.data?.message || 'Erreur génération');
       }
     } catch (err) {
-      console.error('Erreur générer certificat:', err);
-      alert(err.message || 'Erreur');
+      console.error('Erreur générer certificat:', err.response?.data || err);
+      const msg = err.response?.data?.message || err.message || 'Erreur lors de la génération';
+      alert(msg);
     }
   };
 
@@ -193,9 +198,21 @@ function EnseignantCourseEditor() {
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Éditeur du cours — {course.titre}</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <button onClick={() => navigate('/enseignant')} className="px-4 py-2 bg-gray-100 rounded">Retour</button>
-          <button onClick={handleGenerateCertificat} className="px-4 py-2 bg-emerald-600 text-white rounded">Générer certificat</button>
+          <select
+            value={selectedStudentForCert}
+            onChange={(e) => setSelectedStudentForCert(e.target.value)}
+            className="px-3 py-2 border rounded"
+          >
+            <option value="">Sélectionner un étudiant (optionnel)</option>
+            {course.students?.map((s) => (
+              <option key={s._id || s.id} value={s._id || s.id}>
+                {s.prenom} {s.nom} {s.email ? `(${s.email})` : ''}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => handleGenerateCertificat()} className="px-4 py-2 bg-emerald-600 text-white rounded">Générer certificat</button>
         </div>
       </div>
 

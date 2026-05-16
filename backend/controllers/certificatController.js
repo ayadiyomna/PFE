@@ -50,9 +50,12 @@ const generateCertificat = async (req, res) => {
   try {
     const { coursId } = req.params;
     const userId = req.user._id;
-    
-    // Vérifier si l'utilisateur est inscrit au cours
-    const cours = await Cours.findById(coursId);
+    // Permettre à un admin ou à l'instructeur du cours de générer un certificat
+    // pour un autre utilisateur en passant `utilisateur` dans le body.
+    const targetUserId = req.body?.utilisateur || userId;
+
+    // Vérifier si le cours existe
+    const cours = await Cours.findById(coursId).populate('instructeur');
     if (!cours) {
       return res.status(404).json({
         success: false,
@@ -60,27 +63,39 @@ const generateCertificat = async (req, res) => {
       });
     }
     
-    if (!cours.students.includes(userId)) {
+    // Autorisation: si on génère pour un autre utilisateur, autoriser seulement
+    // l'admin ou l'instructeur du cours.
+    const isSelf = targetUserId.toString() === userId.toString();
+    const isAdmin = req.user.role === 'administrateur' || req.user.role === 'admin';
+    const isInstructor = cours.instructeur && (cours.instructeur._id ? cours.instructeur._id.toString() === userId.toString() : cours.instructeur.toString() === userId.toString());
+
+    if (!isSelf && !(isAdmin || isInstructor)) {
+      return res.status(403).json({ success: false, message: 'Non autorisé à générer un certificat pour cet utilisateur' });
+    }
+
+    // Vérifier que l'utilisateur cible est inscrit au cours
+    const studentIds = (cours.students || []).map(s => s.toString());
+    if (!studentIds.includes(targetUserId.toString())) {
       return res.status(403).json({
         success: false,
-        message: 'Vous devez être inscrit pour obtenir un certificat'
+        message: 'L\'utilisateur doit être inscrit au cours pour obtenir un certificat'
       });
     }
     
     // Vérifier si le cours est terminé
     const Progress = require('../models/Progress');
-    const progress = await Progress.findOne({ cours: coursId, utilisateur: userId });
+    const progress = await Progress.findOne({ cours: coursId, utilisateur: targetUserId });
     
     if (!progress || progress.progress < 100) {
       return res.status(400).json({
         success: false,
-        message: 'Vous devez terminer le cours pour obtenir un certificat'
+        message: 'L\'utilisateur doit terminer le cours pour obtenir un certificat'
       });
     }
     
-    // Vérifier si un certificat existe déjà
+    // Vérifier si un certificat existe déjà pour l'utilisateur cible
     const existingCert = await Certificat.findOne({ 
-      utilisateur: userId, 
+      utilisateur: targetUserId, 
       cours: coursId 
     });
     
@@ -92,9 +107,9 @@ const generateCertificat = async (req, res) => {
       });
     }
     
-    // Créer le certificat
+    // Créer le certificat pour l'utilisateur cible
     const certificat = await Certificat.create({
-      utilisateur: userId,
+      utilisateur: targetUserId,
       cours: coursId,
       score: progress.averageScore || 85,
       dateDelivrance: new Date()

@@ -25,6 +25,7 @@ function CreerCours() {
   });
 
   const [enseignants, setEnseignants] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -39,6 +40,22 @@ function CreerCours() {
       }
     };
     fetchEnseignants();
+  }, []);
+
+  // Charger les catégories de la plateforme
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/cours/categories`);
+        const cats = res.data?.data || res.data || [];
+        setCategories(Array.isArray(cats) ? cats : []);
+      } catch (err) {
+        console.error('Erreur lors du chargement des catégories', err);
+        // fallback set de catégories si le backend n'est pas disponible
+        setCategories(["Développement Web", "Data Science", "Marketing"]);
+      }
+    };
+    fetchCategories();
   }, []);
 
   const handleChange = (e) => {
@@ -169,9 +186,9 @@ function CreerCours() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Catégorie *</label>
                   <select name="categorie" value={formData.categorie} onChange={handleChange} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" required>
                     <option value="">Sélectionner</option>
-                    <option value="Développement Web">Développement Web</option>
-                    <option value="Data Science">Data Science</option>
-                    <option value="Marketing">Marketing</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

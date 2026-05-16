@@ -32,6 +32,7 @@ function AdminDashboard() {
     status: "Brouillon",
     dureeTotale: ""
   });
+  const [categories, setCategories] = useState([]);
   const [operationLoading, setOperationLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -102,8 +103,9 @@ function AdminDashboard() {
         if (user?.role === "admin" || user?.role === "administrateur") {
           setIsAuthorized(true);
           loadUsers();
-          loadCourses();
-              loadContactRequests();
+          // charger d'abord les cours puis les catégories (pour fallback)
+          loadCourses().then(() => loadCategories());
+          loadContactRequests();
         } else {
           console.error("❌ User role not admin:", user?.role);
           navigate("/");
@@ -116,6 +118,20 @@ function AdminDashboard() {
       navigate("/login");
     }
   }, []);
+
+  // Charger les catégories depuis le backend
+  const loadCategories = async () => {
+    try {
+      const res = await api.get('/cours/categories');
+      const cats = res.data?.data || res.data || [];
+      setCategories(Array.isArray(cats) ? cats : []);
+    } catch (err) {
+      console.error('Erreur chargement catégories:', err);
+      // fallback: extraire depuis les cours déjà chargés
+      const derived = Array.isArray(cours) ? [...new Set(cours.map(c => c.categorie).filter(Boolean))] : [];
+      setCategories(derived.length ? derived : ["Coran", "Hadith", "Jurisprudence", "Langue Arabe"]);
+    }
+  };
 
   const handleLogout = () => {
     authService.logout();
@@ -789,13 +805,18 @@ function AdminDashboard() {
 
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Catégorie *</label>
-                  <input 
-                    name="categorie" 
-                    value={courseForm.categorie} 
-                    onChange={handleCourseFormChange} 
-                    placeholder="Ex: Coran, Islam, Arabe..." 
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" 
-                  />
+                  <select
+                    name="categorie"
+                    value={courseForm.categorie}
+                    onChange={handleCourseFormChange}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  >
+                    <option value="">Sélectionner</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

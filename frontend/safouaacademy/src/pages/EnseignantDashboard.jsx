@@ -37,6 +37,11 @@ function EnseignantDashboard() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
 
+  // Agréger tous les avis des cours de l'enseignant
+  const allReviews = (courses || [])
+    .flatMap((course) => (course.avis || []).map((a) => ({ ...a, coursId: course._id, coursTitre: course.titre })))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
   useEffect(() => {
     const userData = authService.getCurrentUser();
     if (userData) {
@@ -406,6 +411,7 @@ function EnseignantDashboard() {
             <button onClick={() => setActiveTab("cours")} className={`${activeTab === "cours" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Mes cours</button>
             <button onClick={() => setActiveTab("analytiques")} className={`${activeTab === "analytiques" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Analytiques</button>
             <button onClick={() => setActiveTab("etudiants")} className={`${activeTab === "etudiants" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Étudiants</button>
+            <button onClick={() => setActiveTab("avis")} className={`${activeTab === "avis" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Avis {stats.pendingReviews ? `(${stats.pendingReviews})` : ''}</button>
             <button onClick={() => setActiveTab("parametres")} className={`${activeTab === "parametres" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Paramètres</button>
             <button onClick={handleLogout} className="text-red-600 hover:text-red-700 font-semibold px-3 py-1 rounded transition">Déconnexion</button>
           </nav>
@@ -767,6 +773,39 @@ function EnseignantDashboard() {
                     <span className="text-6xl mb-4 block">👥</span>
                     <p className="text-gray-500">Vous n'avez pas de cours avec des étudiants</p>
                   </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "avis" && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Avis des étudiants</h2>
+
+                {allReviews.length > 0 ? (
+                  <div className="space-y-4">
+                    {allReviews.map((review, idx) => (
+                      <div key={review._id || idx} className="border border-gray-100 rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-semibold text-gray-900">{review.utilisateur?.prenom || review.utilisateur?.nom ? `${review.utilisateur?.prenom || ''} ${review.utilisateur?.nom || ''}` : 'Utilisateur'}</span>
+                              <span className="text-sm text-gray-500">sur</span>
+                              <span className="font-medium text-emerald-600">{review.coursTitre || 'Cours'}</span>
+                            </div>
+                            <div className="flex items-center gap-1 mt-2">
+                              {[...Array(5)].map((_, i) => (
+                                <span key={i} className={i < review.note ? "text-yellow-400" : "text-gray-300"}>★</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-500">{new Date(review.date).toLocaleDateString('fr-FR')}</div>
+                        </div>
+                        <p className="text-gray-700">{review.commentaire || '(pas de commentaire)'}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-6">Aucun avis trouvé pour l'instant.</p>
                 )}
               </div>
             )}

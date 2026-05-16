@@ -383,7 +383,7 @@ function CourseDetail() {
                       checkoutLoading ? 'opacity-60 cursor-wait' : ''
                     }`}
                   >
-                    {checkoutLoading ? 'Traitement...' : 'Acheter le cours'}
+                    {checkoutLoading ? 'Traitement...' : "S'inscrire"}
                   </button>
                 )}
               </div>
