@@ -35,14 +35,13 @@ const certificatSchema = new mongoose.Schema({
 });
 
 // Générer un code unique avant sauvegarde
-certificatSchema.pre('save', async function(next) {
+certificatSchema.pre('save', async function() {
   if (!this.code) {
     const prefix = 'SAF';
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     this.code = `${prefix}-${date}-${random}`;
   }
-  next();
 });
 
 module.exports = mongoose.model('Certificat', certificatSchema);

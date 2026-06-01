@@ -2,7 +2,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Header from "../components/Header";
 import bg from "../assets/4.jpg";
 
 function Home() {
@@ -162,8 +161,6 @@ function Home() {
         theme="colored"
       />
 
-      <Header />
-
       {/* Hero avec image de fond et texte à gauche */}
       <section
         className="relative overflow-hidden min-h-screen flex items-center"
@@ -185,7 +182,6 @@ function Home() {
                 Apprenez l'<span className="bg-gradient-to-r from-emerald-300 to-teal-200 bg-clip-text text-transparent">Islam</span>
                 <br />en ligne
               </h2>
-              
             </div>
             
             <p className="text-lg md:text-xl text-white/90 mb-10 leading-relaxed max-w-xl">
@@ -200,15 +196,6 @@ function Home() {
               >
                 Explorer les cours
               </Link>
-              
-              {!isAuthenticated && (
-                <Link
-                  to="/register"
-                  className="bg-white/20 text-white border-2 border-white/30 px-8 py-4 rounded-2xl text-lg font-bold hover:bg-white/30 backdrop-blur-xl transition-all transform hover:scale-105 active:scale-95 text-center"
-                >
-                  Commencer gratuitement
-                </Link>
-              )}
             </div>
           </div>
         </div>
@@ -219,7 +206,7 @@ function Home() {
         </div>
       </section>
 
-      {/* Catégories - sans numérotation */}
+      {/* Catégories */}
       <section className="py-32 bg-gradient-to-br from-white via-emerald-50/30 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20 animate-fadeInUp">
@@ -230,7 +217,6 @@ function Home() {
           </div>
           
           <div className="relative">
-            {/* Indicateurs */}
             <div className="flex justify-center gap-3 mb-16">
               {categories.map((_, idx) => (
                 <button
@@ -249,7 +235,6 @@ function Home() {
               ))}
             </div>
 
-            {/* Grille - sans badges de numérotation */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {categories.map((cat, idx) => (
                 <div
@@ -260,9 +245,6 @@ function Home() {
                     currentCategory === idx ? 'ring-4 ring-emerald-500/30 shadow-2xl scale-105' : ''
                   }`}
                 >
-                  {/* Badge supprimé */}
-
-                  {/* Icône */}
                   <div className={`w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br ${cat.colorClass} shadow-xl transition-transform duration-300 ${hoveredCategory === idx ? 'rotate-6' : ''} flex items-center justify-center`}>
                     <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332-.477-4.5-1.253" />
@@ -326,8 +308,8 @@ function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white pt-24 pb-12 relative overflow-hidden">
+      {/* Footer avec ID "footer" pour le lien du header */}
+      <footer id="footer" className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white pt-24 pb-12 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5">
           <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500 rounded-full filter blur-3xl animate-pulse"></div>
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-teal-500 rounded-full filter blur-3xl animate-pulse"></div>
@@ -349,14 +331,24 @@ function Home() {
             <div className="animate-fadeInUp animation-delay-100">
               <h5 className="font-bold text-emerald-400 mb-6">Liens rapides</h5>
               <ul className="space-y-4">
-                {['Catalogue', 'Connexion', 'Inscription', 'Contact'].map((item) => (
-                  <li key={item} className="transform transition-all duration-200 hover:translate-x-2">
-                    <Link to={`/${item.toLowerCase()}`} className="text-gray-400 hover:text-white transition flex items-center gap-2">
+                  <li className="transform transition-all duration-200 hover:translate-x-2">
+                    <Link to="/cours" className="text-gray-400 hover:text-white transition flex items-center gap-2">
                       <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
-                      {item}
+                      Catalogue
                     </Link>
                   </li>
-                ))}
+                  <li className="transform transition-all duration-200 hover:translate-x-2">
+                    <Link to="/register" className="text-gray-400 hover:text-white transition flex items-center gap-2">
+                      <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
+                      Inscription
+                    </Link>
+                  </li>
+                  <li className="transform transition-all duration-200 hover:translate-x-2">
+                    <a href="#footer" className="text-gray-400 hover:text-white transition flex items-center gap-2">
+                      <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
+                      Contact
+                    </a>
+                  </li>
               </ul>
             </div>
 
@@ -394,112 +386,48 @@ function Home() {
         </div>
       </footer>
 
-      {/* Styles CSS pour les animations et la police arabe */}
-      <style jsx>{`
+      <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Scheherazade+New:wght@400;700&display=swap');
         
         @keyframes slideDown {
-          from {
-            transform: translateY(-100%);
-          }
-          to {
-            transform: translateY(0);
-          }
+          from { transform: translateY(-100%); }
+          to { transform: translateY(0); }
         }
         
         @keyframes slideInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(-50px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+          from { opacity: 0; transform: translateX(-50px); }
+          to { opacity: 1; transform: translateX(0); }
         }
         
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         
         @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         
         @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
         }
         
-        .animate-slideDown {
-          animation: slideDown 0.5s ease-out;
-        }
+        .animate-slideDown { animation: slideDown 0.5s ease-out; }
+        .animate-slideInLeft { animation: slideInLeft 0.8s ease-out; }
+        .animate-fadeIn { animation: fadeIn 0.8s ease-out; }
+        .animate-fadeInUp { animation: fadeInUp 0.8s ease-out; }
+        .animate-scaleIn { animation: scaleIn 0.8s ease-out; }
         
-        .animate-slideInLeft {
-          animation: slideInLeft 0.8s ease-out;
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.8s ease-out;
-        }
-        
-        .animate-fadeInUp {
-          animation: fadeInUp 0.8s ease-out;
-        }
-        
-        .animate-scaleIn {
-          animation: scaleIn 0.8s ease-out;
-        }
-        
-        .animation-delay-100 {
-          animation-delay: 0.1s;
-        }
-        
-        .animation-delay-200 {
-          animation-delay: 0.2s;
-        }
-        
-        .animation-delay-300 {
-          animation-delay: 0.3s;
-        }
-        
-        .animation-delay-400 {
-          animation-delay: 0.4s;
-        }
-        
-        .animation-delay-500 {
-          animation-delay: 0.5s;
-        }
-        
-        .animation-delay-600 {
-          animation-delay: 0.6s;
-        }
-        
-        .animation-delay-700 {
-          animation-delay: 0.7s;
-        }
-        
-        .animation-delay-800 {
-          animation-delay: 0.8s;
-        }
+        .animation-delay-100 { animation-delay: 0.1s; }
+        .animation-delay-200 { animation-delay: 0.2s; }
+        .animation-delay-300 { animation-delay: 0.3s; }
+        .animation-delay-400 { animation-delay: 0.4s; }
+        .animation-delay-500 { animation-delay: 0.5s; }
+        .animation-delay-600 { animation-delay: 0.6s; }
+        .animation-delay-700 { animation-delay: 0.7s; }
+        .animation-delay-800 { animation-delay: 0.8s; }
         
         .font-arabic {
           font-family: 'Amiri', 'Scheherazade New', 'Traditional Arabic', serif;

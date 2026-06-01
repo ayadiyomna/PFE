@@ -25,7 +25,9 @@ function EtudiantDashboard() {
     totalHours: 0,
     certificates: 0,
     averageScore: 0,
-    nextLesson: null
+    nextLesson: null,
+    streak: 0,
+    weeklyHours: 0
   });
   const [activeTab, setActiveTab] = useState("mes-cours");
   const [categories, setCategories] = useState([]);
@@ -113,8 +115,23 @@ function EtudiantDashboard() {
     }
   };
 
-  const handleContinueCourse = (courseId) => {
-    navigate(`/cours/${courseId}`);
+  const getFirstLessonId = (course) => {
+    const modules = course?.modules || [];
+    for (const module of modules) {
+      const lessons = module?.lecons || module?.lessons || [];
+      if (lessons.length > 0) {
+        return lessons[0]._id || lessons[0].id || "1";
+      }
+    }
+    return null;
+  };
+
+  const handleContinueCourse = (course) => {
+    const courseId = course?._id || course?.id;
+    const lessonId = getFirstLessonId(course) || "1";
+    if (courseId) {
+      navigate(`/cours/${courseId}/lecon/${lessonId}`);
+    }
   };
 
   const handleViewCourse = (courseId) => {
@@ -174,7 +191,6 @@ function EtudiantDashboard() {
       setRecommendedCourses(response.data.data || []);
     } catch (error) {
       console.error("Erreur chargement recommandations:", error);
-      // Fallback: courses populaires
       const allCourses = await coursService.getAllCours();
       if (allCourses.success) {
         setRecommendedCourses(allCourses.data.slice(0, 6));
@@ -197,59 +213,7 @@ function EtudiantDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-md border-t-4 border-emerald-600 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
-            Safoua Academy
-          </Link>
-          
-          <nav className="hidden md:flex space-x-8 items-center">
-            <Link to="/cours" className="text-gray-600 hover:text-emerald-600 transition">
-              Catalogue
-            </Link>
-            <button 
-              onClick={() => setActiveTab("mes-cours")}
-              className={`${activeTab === "mes-cours" ? 'text-emerald-600 font-semibold' : 'text-gray-600 hover:text-emerald-600'}`}
-            >
-              Mes cours ({myCourses.length})
-            </button>
-            <Link to="/etudiant/progression" className="text-gray-600 hover:text-emerald-600 transition">
-              Progression
-            </Link>
-            <Link to="/etudiant/certificats" className="text-gray-600 hover:text-emerald-600 transition">
-              Certificats
-            </Link>
-            <button 
-              onClick={handleLogout}
-              className="text-red-600 hover:text-red-700 font-semibold px-3 py-1 rounded transition"
-            >
-              Déconnexion
-            </button>
-          </nav>
-          
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-emerald-50 px-3 py-2 rounded-lg">
-              <span className="text-emerald-600">👤</span>
-              <span className="text-sm font-semibold text-gray-700">
-                {user?.prenom || user?.nom || 'Étudiant'}
-              </span>
-            </div>
-            <button 
-              onClick={() => navigate('/compte')}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
-            >
-              Mon compte
-            </button>
-            <button 
-              onClick={handleLogout} 
-              className="md:hidden p-2 text-red-600 hover:bg-red-50 rounded-lg transition" 
-              title="Déconnexion"
-            >
-              🚪
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* HEADER INTERNE SUPPRIMÉ */}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
@@ -371,7 +335,7 @@ function EtudiantDashboard() {
                     <div 
                       key={course._id} 
                       className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition cursor-pointer"
-                      onClick={() => handleContinueCourse(course._id)}
+                      onClick={() => handleContinueCourse(course)}
                     >
                       <div className="flex flex-col md:flex-row">
                         <div className="md:w-48 h-32 md:h-auto relative">
@@ -419,7 +383,7 @@ function EtudiantDashboard() {
                             </div>
                             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                               <button
-                                onClick={() => handleContinueCourse(course._id)}
+                                onClick={() => handleContinueCourse(course)}
                                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
                               >
                                 {course.progress === 0 ? 'Commencer' : 'Continuer'}

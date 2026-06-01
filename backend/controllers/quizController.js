@@ -57,10 +57,11 @@ const getAvailableQuizzes = async (req, res) => {
     }).sort('-createdAt');
     
     const formattedQuizzes = quizzes.map(quiz => ({
+      _id: quiz._id,
       id: quiz._id,
       title: quiz.titre,
       module: quiz.module,
-      questions: quiz.questions?.length || 10,
+      questions: quiz.questions,
       duration: `${quiz.duration || 15}min`,
       difficulty: quiz.difficulty || 'Intermédiaire',
       points: quiz.points || 100
@@ -122,13 +123,45 @@ const submitQuiz = async (req, res) => {
       completedAt: new Date()
     });
     
+    // Génération automatique du certificat si conditions réunies
+    let certificatGenere = null;
+    if (passed) {
+      // Vérifier la progression de l'étudiant sur ce cours
+      const progress = await require('../models/Progress').findOne({
+        utilisateur: userId,
+        cours: quiz.cours
+      });
+      if (progress && progress.progress === 100) {
+        // Vérifier qu'il n'a pas déjà un certificat
+        const Certificat = require('../models/Certificat');
+        const existingCert = await Certificat.findOne({ utilisateur: userId, cours: quiz.cours });
+        if (!existingCert) {
+          // Générer un code unique pour le certificat
+          const prefix = 'SAF';
+          const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+          const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+          const code = `${prefix}-${date}-${random}`;
+          
+          // Générer le certificat
+          certificatGenere = await Certificat.create({
+            utilisateur: userId,
+            cours: quiz.cours,
+            code,
+            score,
+            dateDelivrance: new Date()
+          });
+        }
+      }
+    }
+
     res.json({
       success: true,
       data: {
         score,
         correctCount,
         totalQuestions: quiz.questions.length,
-        passed
+        passed,
+        certificat: certificatGenere
       },
       message: passed ? 'Quiz réussi !' : 'Quiz terminé'
     });
@@ -153,8 +186,92 @@ const submitQuiz = async (req, res) => {
   }
 };
 
+/**
+ * Créer un nouveau quiz pour un cours
+ */
+const createQuiz = async (req, res) => {
+  try {
+    const { titre, cours, module, questions, duration, difficulty, points, isActive, passingScore } = req.body;
+    const quiz = await Quiz.create({
+      titre,
+      cours,
+      module,
+      questions,
+      duration,
+      difficulty,
+      points,
+      isActive,
+      passingScore
+    });
+    res.status(201).json({ success: true, data: quiz });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Mettre à jour un quiz existant
+ */
+const updateQuiz = async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const updates = req.body;
+    const quiz = await Quiz.findByIdAndUpdate(quizId, updates, { new: true });
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz non trouvé' });
+    res.json({ success: true, data: quiz });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Supprimer un quiz
+ */
+const deleteQuiz = async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const quiz = await Quiz.findByIdAndDelete(quizId);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz non trouvé' });
+    res.json({ success: true, message: 'Quiz supprimé' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Lister les quiz d'un cours
+ */
+const listQuizzesByCourse = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const quizzes = await Quiz.find({ cours: courseId });
+    res.json({ success: true, data: quizzes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Obtenir un quiz par ID
+ */
+const getQuizById = async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz non trouvé' });
+    res.json({ success: true, data: quiz });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getQuizHistory,
   getAvailableQuizzes,
-  submitQuiz
+  submitQuiz,
+  createQuiz,
+  updateQuiz,
+  deleteQuiz,
+  listQuizzesByCourse,
+  getQuizById
 };

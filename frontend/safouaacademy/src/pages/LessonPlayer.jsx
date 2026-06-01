@@ -278,9 +278,8 @@ function LessonPlayer() {
           toast.success("🎉 Félicitations ! Vous avez terminé toutes les leçons !");
           
           setTimeout(() => {
-            if (window.confirm("Voulez-vous passer le quiz final maintenant ?")) {
-              navigate(`/quiz/cours/${courseId}/final`);
-            }
+            // Le quiz final ne s'ouvre plus automatiquement via une alerte.
+            // L'utilisateur reste sur la page de leçon après avoir terminé toutes les leçons.
           }, 1000);
         }
       }
@@ -635,9 +634,9 @@ function LessonPlayer() {
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Ressources</h2>
               <div className="space-y-2">
-                {lesson.resources?.map((resource) => (
+                {lesson.resources?.map((resource, idx) => (
                   <div
-                    key={resource.id}
+                    key={resource.id || idx}
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition border border-gray-100"
                   >
                     <span className="text-emerald-600 text-xl">
@@ -664,8 +663,8 @@ function LessonPlayer() {
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">🔖 Marque-pages</h2>
                 <div className="space-y-2">
-                  {bookmarks.sort((a, b) => a.time - b.time).map((bookmark) => (
-                    <div key={bookmark.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                  {bookmarks.sort((a, b) => a.time - b.time).map((bookmark, idx) => (
+                    <div key={bookmark.id || idx} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
                       <button
                         onClick={() => handleJumpToBookmark(bookmark.time)}
                         className="flex items-center gap-2 text-left flex-1"
@@ -696,9 +695,9 @@ function LessonPlayer() {
                 Contenu du cours
               </h2>
               <div className="space-y-1 max-h-[500px] overflow-y-auto">
-                {lessons.map((l) => (
+                {lessons.map((l, idx) => (
                   <button
-                    key={l.id}
+                    key={l.id || idx}
                     onClick={() => handleLessonSelect(l.id)}
                     className={`w-full text-left p-3 rounded-lg transition flex items-start gap-3 ${
                       l.id === lessonId 

@@ -11,6 +11,8 @@
     "serve": "vite preview"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^6.5.0",
+    "@stripe/stripe-js": "^9.7.0",
     "axios": "^1.13.6",
     "framer-motion": "^12.36.0",
     "lucide-react": "^0.576.0",

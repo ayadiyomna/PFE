@@ -33,6 +33,7 @@ function AdminDashboard() {
     dureeTotale: ""
   });
   const [categories, setCategories] = useState([]);
+  const [categoryDocs, setCategoryDocs] = useState([]);
   const [operationLoading, setOperationLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -99,19 +100,15 @@ function AdminDashboard() {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        console.log("👤 Current user:", user); // Debug log
         if (user?.role === "admin" || user?.role === "administrateur") {
           setIsAuthorized(true);
           loadUsers();
-          // charger d'abord les cours puis les catégories (pour fallback)
-          loadCourses().then(() => loadCategories());
+          loadCourses().then(() => { loadCategoriesFromAPI(); });
           loadContactRequests();
         } else {
-          console.error("❌ User role not admin:", user?.role);
           navigate("/");
         }
       } catch (e) {
-        console.error("❌ Error parsing user:", e);
         navigate("/login");
       }
     } else {
@@ -119,15 +116,14 @@ function AdminDashboard() {
     }
   }, []);
 
-  // Charger les catégories depuis le backend
   const loadCategories = async () => {
     try {
-      const res = await api.get('/cours/categories');
-      const cats = res.data?.data || res.data || [];
-      setCategories(Array.isArray(cats) ? cats : []);
+      const res = await api.get('/cours/categories/all');
+      const cats = Array.isArray(res.data?.data) ? res.data.data : [];
+      setCategoryDocs(cats);
+      setCategories(cats.map((c) => c.nom));
     } catch (err) {
       console.error('Erreur chargement catégories:', err);
-      // fallback: extraire depuis les cours déjà chargés
       const derived = Array.isArray(cours) ? [...new Set(cours.map(c => c.categorie).filter(Boolean))] : [];
       setCategories(derived.length ? derived : ["Coran", "Hadith", "Jurisprudence", "Langue Arabe"]);
     }
@@ -242,7 +238,6 @@ function AdminDashboard() {
     setOperationLoading(true);
     try {
       if (editingStudent) {
-        // Update user
         const updateData = {
           nom: formData.nom,
           prenom: formData.prenom,
@@ -250,7 +245,7 @@ function AdminDashboard() {
           role: formData.role
         };
         if (formData.password.trim()) {
-          updateData.password = formData.password;
+          updateData.mdp = formData.password;
         }
         
         const result = await api.put(`/users/${editingStudent._id}`, updateData);
@@ -262,19 +257,18 @@ function AdminDashboard() {
           showMessage("Erreur lors de la modification", true);
         }
       } else {
-        // Create new user
         if (!formData.password.trim()) {
           showMessage("Le mot de passe est requis pour un nouvel utilisateur", true);
           setOperationLoading(false);
           return;
         }
 
-        const result = await api.post("/users", {
+        const result = await api.post("/users/register", {
           nom: formData.nom,
           prenom: formData.prenom,
           email: formData.email,
           role: formData.role,
-          password: formData.password
+          mdp: formData.password
         });
 
         if (result?.data?.success) {
@@ -321,7 +315,6 @@ function AdminDashboard() {
 
   const handleCreateCourse = async () => {
     try {
-      // Validation des champs requis
       if (!courseForm.titre.trim()) {
         showMessage("Le titre du cours est requis", true);
         return;
@@ -338,7 +331,6 @@ function AdminDashboard() {
         showMessage("Le niveau du cours est requis", true);
         return;
       }
-      // Validation de l'enum niveau
       if (!VALID_NIVEAUX.includes(courseForm.niveau)) {
         showMessage(`Le niveau "${courseForm.niveau}" n'est pas valide. Valeurs acceptées: ${VALID_NIVEAUX.join(', ')}`, true);
         return;
@@ -370,7 +362,7 @@ function AdminDashboard() {
         titre: courseForm.titre.trim(),
         description: courseForm.description.trim(),
         categorie: courseForm.categorie.trim(),
-        niveau: courseForm.niveau.trim(), // This will be one of the valid enum values
+        niveau: courseForm.niveau.trim(),
         prix: parseFloat(courseForm.prix) || 0,
         instructeur: courseForm.instructeur,
         status: courseForm.status || "Brouillon",
@@ -381,8 +373,6 @@ function AdminDashboard() {
         payload.students = [];
       }
 
-      console.log('📋 Payload envoyé:', payload);
-
       let result;
       if (editingCourse) {
         result = await coursService.updateCours(editingCourse._id, payload);
@@ -392,7 +382,6 @@ function AdminDashboard() {
 
       if (result.success) {
         showMessage(editingCourse ? "Cours mis à jour avec succès!" : "Espace de cours créé avec succès!", false);
-
         resetCourseForm();
         await loadCourses();
       } else {
@@ -427,6 +416,140 @@ function AdminDashboard() {
     freeCourses: cours.filter((c) => c.prix === 0).length,
     paidCourses: cours.filter((c) => c.prix > 0).length,
     categories: [...new Set(cours.map((c) => c.categorie).filter(Boolean))].length
+  };
+
+  const categoryCounts = Array.from(
+    cours.reduce((map, course) => {
+      const category = course.categorie || "Non définie";
+      map.set(category, (map.get(category) || 0) + 1);
+      return map;
+    }, new Map())
+  ).map(([category, count]) => ({ category, count }));
+
+  const adminTasks = [
+    { title: "Utilisateurs", description: "Gérer comptes et permissions", tab: "users", icon: "👤" },
+    { title: "Cours", description: "Passer en revue les espaces et statuts", tab: "courses", icon: "📚" },
+    { title: "Catégories", description: "Voir les catégories et leurs cours", tab: "categories", icon: "🗂️" },
+    { title: "Demandes", description: "Traiter les requêtes des enseignants", tab: "demandes", icon: "✉️" }
+  ];
+
+  // Category CRUD UI state + handlers
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [categoryForm, setCategoryForm] = useState({ nom: "", description: "", icon: "📚", couleur: "#10b981", ordre: 0 });
+
+  const loadCategoriesFromAPI = async () => {
+    try {
+      const res = await api.get('/cours/categories/all');
+      const cats = res.data?.data || [];
+      const docs = Array.isArray(cats) ? cats : [];
+      const isDocs = docs.length > 0 && typeof docs[0] === 'object';
+      setCategoryDocs(isDocs ? docs : []);
+      setCategories(isDocs ? docs.map((c) => c.nom) : docs);
+    } catch (err) {
+      console.error('Erreur chargement catégories (API):', err);
+    }
+  };
+
+  const resetCategoryForm = () => {
+    setEditingCategory(null);
+    setCategoryForm({ nom: "", description: "", icon: "📚", couleur: "#10b981", ordre: 0 });
+  };
+
+  const handleCategoryFormChange = (e) => {
+    const { name, value } = e.target;
+    setCategoryForm(prev => ({ ...prev, [name]: name === 'ordre' ? parseInt(value) || 0 : value }));
+  };
+
+  const handleAddCategory = () => {
+    resetCategoryForm();
+    setShowCategoryModal(true);
+  };
+
+  const handleEditCategory = async (catName) => {
+    try {
+      let found = categoryDocs.find((c) => c.nom === catName);
+      if (!found) {
+        const res = await api.get('/cours/categories/all');
+        const docs = Array.isArray(res.data?.data) ? res.data.data : [];
+        setCategoryDocs(docs);
+        found = docs.find((c) => c.nom === catName);
+      }
+      if (!found) {
+        showMessage('Catégorie introuvable pour modification', true);
+        return;
+      }
+      setEditingCategory(found);
+      setCategoryForm({
+        nom: found.nom || '',
+        description: found.description || '',
+        icon: found.icon || '📚',
+        couleur: found.couleur || '#10b981',
+        ordre: found.ordre ?? 0
+      });
+      setShowCategoryModal(true);
+    } catch (err) {
+      console.error('Erreur chargement catégorie pour modification:', err);
+      showMessage('Impossible de charger la catégorie', true);
+    }
+  };
+
+  const handleSaveCategory = async () => {
+    if (!categoryForm.nom.trim()) { showMessage('Le nom de la catégorie est requis', true); return; }
+    setOperationLoading(true);
+    try {
+      let res;
+      if (editingCategory && editingCategory._id) {
+        res = await api.put(`/cours/categories/${editingCategory._id}`, categoryForm);
+      } else {
+        res = await api.post('/cours/categories', categoryForm);
+      }
+
+      if (res?.data?.success) {
+        await loadCategoriesFromAPI();
+        await loadCourses();
+        setShowCategoryModal(false);
+        resetCategoryForm();
+        showMessage(editingCategory ? 'Catégorie mise à jour avec succès' : 'Catégorie créée avec succès');
+      } else {
+        showMessage(res?.data?.message || 'Erreur lors de l\'opération', true);
+      }
+    } catch (err) {
+      console.error('Erreur save category:', err, err?.response?.data || err?.message);
+      const serverMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+      showMessage(serverMessage || 'Erreur serveur', true);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catName) => {
+    if (!confirm(`Supprimer la catégorie "${catName}" ?`)) return;
+    setOperationLoading(true);
+    try {
+      let found = categoryDocs.find((c) => c.nom === catName);
+      if (!found) {
+        const all = await api.get('/cours/categories/all');
+        const docs = Array.isArray(all.data?.data) ? all.data.data : [];
+        setCategoryDocs(docs);
+        found = docs.find((c) => c.nom === catName);
+      }
+      if (!found) throw new Error('Catégorie introuvable');
+      const res = await api.delete(`/cours/categories/${found._id}`);
+      if (res?.data?.success) {
+        await loadCategoriesFromAPI();
+        await loadCourses();
+        showMessage('Catégorie supprimée');
+      } else {
+        showMessage(res?.data?.message || 'Erreur suppression', true);
+      }
+    } catch (err) {
+      console.error('Erreur delete category:', err, err?.response?.data || err?.message);
+      const serverMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+      showMessage(serverMessage || 'Erreur serveur', true);
+    } finally {
+      setOperationLoading(false);
+    }
   };
 
   if (!isAuthorized || loading) {
@@ -469,7 +592,7 @@ function AdminDashboard() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900 mb-3">Confirmer suppression du cours</h3>
-            <p className="text-slate-600 mb-6">Cette action supprimera le cours de l’espace admin et ne peut pas être annulée.</p>
+            <p className="text-slate-600 mb-6">Cette action supprimera le cours de l'espace admin et ne peut pas être annulée.</p>
             <div className="flex gap-3">
               <button onClick={handleDeleteCourse} disabled={operationLoading} className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">{operationLoading ? "Suppression..." : "Supprimer"}</button>
               <button onClick={() => setDeleteCourseId(null)} disabled={operationLoading} className="flex-1 border border-slate-200 py-2.5 rounded-xl font-semibold hover:bg-slate-50 disabled:opacity-50">Annuler</button>
@@ -518,67 +641,161 @@ function AdminDashboard() {
           </div>
         </div>
       )}
-
-      <aside className="w-72 bg-white border-r border-emerald-100 hidden lg:flex flex-col shadow-sm">
-        <div className="px-6 py-6 border-b border-emerald-100 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-600 flex items-center justify-center text-white font-black">S</div>
-          <div>
-            <h1 className="font-black text-xl text-emerald-700">Safoua Academy</h1>
-            <p className="text-xs text-slate-500">Admin Panel</p>
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-slate-900 mb-5">{editingCategory ? "Modifier" : "Ajouter"} une catégorie</h3>
+            {errorMessage && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-xl text-sm">{errorMessage}</div>}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Nom *</label>
+                <input name="nom" value={categoryForm.nom} onChange={handleCategoryFormChange} placeholder="Ex: Coran" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
+                <textarea name="description" value={categoryForm.description} onChange={handleCategoryFormChange} placeholder="Description de la catégorie..." className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Icône</label>
+                  <input name="icon" value={categoryForm.icon} onChange={handleCategoryFormChange} placeholder="📚" maxLength="2" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-center text-2xl" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Couleur</label>
+                  <input name="couleur" value={categoryForm.couleur} onChange={handleCategoryFormChange} type="color" className="w-full h-12 p-1 rounded-xl border border-slate-200" />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleSaveCategory} disabled={operationLoading} className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">{operationLoading ? "Enregistrement..." : (editingCategory ? "Modifier" : "Ajouter")}</button>
+              <button onClick={() => setShowCategoryModal(false)} disabled={operationLoading} className="flex-1 border border-slate-200 py-2.5 rounded-xl font-semibold hover:bg-slate-50 disabled:opacity-50">Annuler</button>
+            </div>
           </div>
         </div>
-        <nav className="p-4 space-y-2 text-sm font-medium">
+      )}
+
+      <aside className="w-72 bg-white border-r border-emerald-100 hidden lg:flex flex-col shadow-xl">
+        <div className="px-6 py-8 border-b border-emerald-100 flex items-start gap-4">
+          <div className="w-12 h-12 rounded-3xl bg-emerald-600 flex items-center justify-center text-white text-lg font-black">S</div>
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">Safoua Academy</p>
+            <h2 className="text-xl font-black text-slate-900">Admin Panel</h2>
+            <p className="text-xs text-slate-500 max-w-[12rem]">Tableau de bord centralisé pour votre équipe.</p>
+          </div>
+        </div>
+        <nav className="p-4 space-y-3 text-sm font-semibold">
           {[
             ["dashboard", "Dashboard"],
             ["users", "Utilisateurs"],
             ["students", "Étudiants"],
             ["teachers", "Enseignants"],
             ["courses", "Cours"],
+            ["categories", "Catégories"],
             ["create-espace", "Créer Espace"]
           ].map(([key, label]) => (
-            <button key={key} onClick={() => setActiveTab(key)} className={`w-full text-left px-4 py-3 rounded-xl transition ${activeTab === key ? "bg-emerald-600 text-white shadow" : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"}`}>{label}</button>
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`w-full text-left px-4 py-3 rounded-2xl transition-all ${activeTab === key ? "bg-emerald-600 text-white shadow-lg ring-1 ring-emerald-100" : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"}`}
+            >
+              {label}
+            </button>
           ))}
-          <button onClick={handleLogout} className="w-full text-left px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition">Déconnexion</button>
+          <button onClick={handleLogout} className="w-full text-left px-4 py-3 rounded-2xl text-red-600 hover:bg-red-50 transition-all">Déconnexion</button>
         </nav>
       </aside>
 
       <div className="flex-1 min-w-0">
-        <header className="bg-white/90 backdrop-blur border-b border-emerald-100 sticky top-0 z-40">
-          <div className="px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm text-slate-500">Welcome back,</p>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Dashboard Administration</h2>
-            </div>
-            <div className="flex items-center gap-3">
-              <button onClick={handleLogout} className="hidden sm:inline-flex px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700">Déconnexion</button>
-            </div>
-          </div>
-        </header>
-
         <main className="p-4 sm:p-6 lg:p-8 space-y-6">
-          <div className="relative max-w-xl">
-            <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Rechercher un utilisateur, étudiant, enseignant..." className="w-full bg-white border border-emerald-100 rounded-2xl px-4 py-3 pl-12 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm" />
-            <span className="absolute left-4 top-3.5 text-slate-400">🔎</span>
-          </div>
+          <section className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-700">Administration</p>
+                <h1 className="mt-3 text-3xl sm:text-4xl font-black text-slate-900">Bienvenue sur votre tableau de bord</h1>
+                <p className="mt-3 text-sm text-slate-500">Gérez les utilisateurs, les cours et les actions de votre espace admin avec une interface claire et moderne.</p>
+              </div>
+              <div className="w-full max-w-xl">
+                <div className="relative">
+                  <input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Rechercher un utilisateur, étudiant, enseignant..."
+                    className="w-full rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 pl-12 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                  />
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔎</span>
+                </div>
+              </div>
+            </div>
+          </section>
 
           {activeTab === "dashboard" && (
             <>
               <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 {[
-                  ["Utilisateurs", dashboardStats.totalUsers, "bg-emerald-600"],
-                  ["Étudiants", dashboardStats.students, "bg-emerald-500"],
-                  ["Enseignants", dashboardStats.teachers, "bg-emerald-700"],
-                  ["Cours", dashboardStats.courses, "bg-emerald-400"]
-                ].map(([label, value, color]) => (
-                  <div key={label} className="bg-white rounded-3xl p-6 shadow-sm border border-emerald-100">
-                    <div className={`w-12 h-12 rounded-2xl ${color} text-white flex items-center justify-center mb-4`}>●</div>
-                    <p className="text-sm text-slate-500">{label}</p>
-                    <p className="text-3xl font-black text-slate-900 mt-1">{value}</p>
+                  ["Utilisateurs", dashboardStats.totalUsers, "bg-emerald-600", "Membres actifs"],
+                  ["Étudiants", dashboardStats.students, "bg-emerald-500", "Étudiants inscrits"],
+                  ["Enseignants", dashboardStats.teachers, "bg-emerald-700", "Formateurs actifs"],
+                  ["Catégories", dashboardStats.categories, "bg-emerald-400", "Thèmes de cours"]
+                ].map(([label, value, color, subtitle]) => (
+                  <div key={label} className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className={`w-12 h-12 rounded-3xl ${color} text-white grid place-items-center shadow-md`}>●</div>
+                      <span className="text-xs uppercase tracking-[0.24em] text-slate-400">{label}</span>
+                    </div>
+                    <p className="mt-6 text-4xl font-black text-slate-900">{value}</p>
+                    <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
                   </div>
                 ))}
               </section>
 
-              {/* Le formulaire 'Créer un espace de cours' a été supprimé */}
+              <section className="grid grid-cols-1 xl:grid-cols-[1.9fr_1fr] gap-4">
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">Analyse des catégories</h2>
+                      <p className="mt-2 text-sm text-slate-500">Répartition des cours par catégorie pour repérer les sujets dominants.</p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">{dashboardStats.courses} cours au total</span>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    {categoryCounts.slice(0, 5).map(({ category, count }) => (
+                      <div key={category} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm text-slate-600">
+                          <span>{category}</span>
+                          <span className="font-semibold text-slate-900">{count}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500" style={{ width: `${Math.min(100, Math.round((count / Math.max(1, dashboardStats.courses)) * 100))}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                    {categoryCounts.length === 0 && (
+                      <p className="text-sm text-slate-500">Aucune catégorie disponible pour l'instant.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Tâches administratives</h2>
+                    <p className="mt-2 text-sm text-slate-500">Actions rapides pour piloter votre espace.</p>
+                  </div>
+                  <div className="mt-6 grid gap-3">
+                    {adminTasks.map((task) => (
+                      <button key={task.title} onClick={() => setActiveTab(task.tab)} className="w-full text-left rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 transition hover:border-emerald-200 hover:bg-white">
+                        <div className="flex items-center gap-4">
+                          <span className="text-lg">{task.icon}</span>
+                          <div>
+                            <p className="font-semibold text-slate-900">{task.title}</p>
+                            <p className="text-sm text-slate-500">{task.description}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
             </>
           )}
 
@@ -586,7 +803,7 @@ function AdminDashboard() {
             <section className="bg-white rounded-3xl p-6 shadow-sm border border-emerald-100">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-bold text-slate-900">Gestion des Utilisateurs</h3>
-                <button onClick={handleAddStudent} className=" hidden bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700">+ Ajouter Utilisateur</button>
+                <button onClick={handleAddStudent} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700">+ Ajouter Utilisateur</button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -733,6 +950,80 @@ function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === "categories" && (
+            <section className="bg-white rounded-3xl p-6 shadow-sm border border-emerald-100">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Gestion des catégories</h3>
+                  <p className="text-sm text-slate-500">Visualisez les catégories de cours et leur volume.</p>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">{dashboardStats.categories} catégories</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-semibold text-slate-900">Tendances de catégories</h4>
+                      <p className="text-sm text-slate-500">Les catégories les plus populaires sont listées ici.</p>
+                    </div>
+                    <span className="text-xs uppercase tracking-[0.24em] text-slate-400">{cours.length} cours total</span>
+                  </div>
+                  <div className="space-y-4">
+                    {categoryCounts.length ? categoryCounts.map(({ category, count }) => (
+                      <div key={category} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm text-slate-600">
+                          <span>{category}</span>
+                          <span className="font-semibold text-slate-900">{count}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-white shadow-inner overflow-hidden">
+                          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, Math.round((count / Math.max(1, dashboardStats.courses)) * 100))}%` }} />
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-sm text-slate-500">Aucune catégorie à afficher.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold text-slate-900">Gestion des catégories</h4>
+                      <p className="text-sm text-slate-500">Modifier ou supprimer les catégories enregistrées.</p>
+                    </div>
+                    <button onClick={handleAddCategory} className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition">+ Ajouter</button>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    <button onClick={loadCategoriesFromAPI} className="w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition">⟳ Charger catégories (serveur)</button>
+                  </div>
+                  <div className="space-y-4">
+                    {categoryDocs.length ? categoryDocs.map((cat) => (
+                      <div key={cat._id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-slate-900">{cat.nom}</p>
+                            <p className="text-xs text-slate-500">{cat.description || 'Pas de description'}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleEditCategory(cat.nom)} className="px-3 py-1 text-xs font-semibold rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition">Modifier</button>
+                            <button onClick={() => handleDeleteCategory(cat.nom)} className="px-3 py-1 text-xs font-semibold rounded-xl border border-red-200 text-red-700 hover:bg-red-50 transition">Supprimer</button>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1">{cat.icon || '📚'}</span>
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1">ordre: {cat.ordre ?? 0}</span>
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-sm text-slate-500">Aucune catégorie enregistrée pour le moment.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </section>
           )}

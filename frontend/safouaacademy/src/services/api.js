@@ -10,8 +10,11 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 30000,
 });
+
+// Export a default request timeout constant for shared use
+export const REQUEST_TIMEOUT_MS = 30000;
 
 // Variable pour éviter les appels multiples à health check
 let healthCheckPromise = null;

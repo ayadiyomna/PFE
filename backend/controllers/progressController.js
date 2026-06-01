@@ -24,19 +24,22 @@ const getProgress = async (req, res) => {
     
     const modules = enrolledCourses.map(course => {
       const progress = progresses.find(p => p.cours.toString() === course._id.toString());
-      const completedLessons = progress?.completedLessons || 0;
+      const completedLessonsArray = progress?.completedLessons || [];
+      const completedLessonsCount = Array.isArray(completedLessonsArray)
+        ? completedLessonsArray.length
+        : (Number(completedLessonsArray) || 0);
       const totalCourseLessons = course.modules?.reduce((sum, m) => sum + (m.lecons?.length || 0), 0) || 0;
-      
-      totalCompletedLessons += completedLessons;
+
+      totalCompletedLessons += completedLessonsCount;
       totalLessons += totalCourseLessons;
-      
+
       return {
         id: course._id,
         name: course.titre,
-        progress: totalCourseLessons > 0 ? Math.round((completedLessons / totalCourseLessons) * 100) : 0,
-        completed: completedLessons === totalCourseLessons,
+        progress: totalCourseLessons > 0 ? Math.round((completedLessonsCount / totalCourseLessons) * 100) : 0,
+        completed: completedLessonsCount === totalCourseLessons,
         lessons: totalCourseLessons,
-        completedLessons: completedLessons
+        completedLessons: completedLessonsCount
       };
     });
     

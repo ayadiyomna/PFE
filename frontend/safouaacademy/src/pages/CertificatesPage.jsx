@@ -109,36 +109,6 @@ function CertificatesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-md border-t-4 border-emerald-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
-            Safoua Academy
-          </Link>
-          
-          <nav className="hidden md:flex space-x-8">
-            <Link to="/cours" className="text-gray-600 hover:text-emerald-600">
-              Catalogue
-            </Link>
-            <Link to="/etudiant" className="text-gray-600 hover:text-emerald-600">
-              Mes cours
-            </Link>
-            <Link to="/etudiant/progression" className="text-gray-600 hover:text-emerald-600">
-              Progression
-            </Link>
-            <Link to="/certificats" className="text-emerald-600 font-semibold">
-              Certificats
-            </Link>
-          </nav>
-          
-          <button 
-            onClick={() => navigate('/etudiant')}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
-          >
-            Mon compte
-          </button>
-        </div>
-      </header>
-
       {/* Modal de partage */}
       {shareModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

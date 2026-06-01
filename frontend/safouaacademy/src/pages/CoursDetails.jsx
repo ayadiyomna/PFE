@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useParams } from "react-router-dom";
 import "react-toastify/dist/ReactToastify.css";
@@ -6,6 +7,31 @@ import authService from "../services/authService";
 import api from "../services/api";
 
 function CourseDetail() {
+      // Check if the user is enrolled in the course
+      const checkEnrollment = () => {
+        if (course && user) {
+          // If the course has a students array, check if the user's id is present
+          if (Array.isArray(course.students)) {
+            setIsEnrolled(course.students.includes(user._id));
+          } else {
+            setIsEnrolled(false);
+          }
+        }
+      };
+    // Fetch user progress for the course
+    const loadProgress = async () => {
+      try {
+        const response = await api.get(`/progress/cours/${id}`);
+        if (response.data.success) {
+          setProgress(response.data.data.progress || 0);
+        } else {
+          setProgress(0);
+        }
+      } catch (error) {
+        console.error("Erreur chargement progression:", error);
+        setProgress(0);
+      }
+    };
   const navigate = useNavigate();
   const { id } = useParams();
   const [course, setCourse] = useState(null);
@@ -20,6 +46,22 @@ function CourseDetail() {
   const [progress, setProgress] = useState(0);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
+
+
+  // Fetch reviews for the course
+  const loadReviews = async () => {
+    try {
+      const response = await api.get(`/cours/${id}/avis`);
+      if (response.data.success) {
+        setReviews(response.data.data);
+      } else {
+        setReviews([]);
+      }
+    } catch (error) {
+      console.error("Erreur chargement avis:", error);
+      setReviews([]);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -42,7 +84,6 @@ function CourseDetail() {
     try {
       setLoading(true);
       const result = await coursService.getCoursById(id);
-
       if (result.success) {
         setCourse(result.data);
       } else {
@@ -56,49 +97,7 @@ function CourseDetail() {
     }
   };
 
-  const checkEnrollment = async () => {
-    if (!isAuthenticated || !user || !course) return;
-
-    try {
-      const isUserEnrolled = course.students?.some((s) => {
-        const studentId = s._id ? s._id.toString() : s.toString();
-        return (
-          studentId === user.id?.toString() ||
-          studentId === user._id?.toString()
-        );
-      });
-      setIsEnrolled(isUserEnrolled);
-    } catch (error) {
-      console.error("Erreur vérification inscription:", error);
-    }
-  };
-
-  const loadReviews = async () => {
-    try {
-      const response = await api.get(`/cours/${id}/avis`);
-      setReviews(response.data.data || []);
-    } catch (error) {
-      console.error("Erreur chargement avis:", error);
-    }
-  };
-
-  const loadProgress = async () => {
-    if (!isAuthenticated) return;
-
-    try {
-      const response = await api.get(`/progress/cours/${id}`);
-      setProgress(response.data.data?.progress || 0);
-    } catch (error) {
-      console.error("Erreur chargement progression:", error);
-    }
-  };
-
   const handleEnroll = async () => {
-    if (!isAuthenticated) {
-      navigate("/login");
-      return;
-    }
-
     try {
       const result = await coursService.enrollToCours(id);
       if (result.success) {
@@ -110,34 +109,15 @@ function CourseDetail() {
     }
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (!course) return;
 
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    try {
-      setCheckoutLoading(true);
-      setCheckoutError(null);
 
-      const response = await api.post(`/payment/create-checkout-session`, { course });
-      const data = response.data;
-
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        const message = data?.error || data?.message || "Impossible de démarrer le paiement.";
-        console.error("Stripe URL introuvable:", data);
-        setCheckoutError(message);
-      }
-    } catch (error) {
-      console.error("Payment Error:", error);
-      const serverMessage = error?.response?.data?.error || error?.response?.data?.message;
-      setCheckoutError(serverMessage || error?.message || "Erreur serveur pendant le paiement.");
-    } finally {
-      setCheckoutLoading(false);
-    }
+    navigate(`/cours/${id}/paiement`);
   };
 
   const handleStartCourse = () => {
@@ -217,56 +197,6 @@ function CourseDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-md border-t-4 border-emerald-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition" title="Retour">
-              ←
-            </button>
-            <Link to="/" className="text-2xl font-extrabold text-emerald-700 tracking-wider">
-              Safoua Academy
-            </Link>
-          </div>
-
-          <nav className="hidden md:flex space-x-8">
-            <Link to="/cours" className="text-gray-600 hover:text-emerald-600">
-              Catalogue
-            </Link>
-            {!isAuthenticated ? (
-              <Link to="/login" className="text-gray-600 hover:text-emerald-600">
-                Connexion
-              </Link>
-            ) : (
-              <button
-                onClick={() => {
-                  authService.logout();
-                  navigate("/");
-                }}
-                className="text-red-600 hover:text-red-700"
-              >
-                Déconnexion
-              </button>
-            )}
-          </nav>
-
-          {isAuthenticated ? (
-            <button
-              onClick={() => navigate("/etudiant")}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
-            >
-              Mon compte
-            </button>
-          ) : (
-            <Link
-              to="/login"
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
-            >
-              Se connecter
-            </Link>
-          )}
-        </div>
-      </header>
-
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
           <div className="relative h-64 bg-emerald-100">

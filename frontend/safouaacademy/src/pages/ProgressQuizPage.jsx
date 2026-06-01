@@ -154,13 +154,13 @@ function ProgressQuizPage() {
                 <>
                   <div className="mb-4 p-4 bg-emerald-50 rounded-lg">
                     <p className="text-sm text-emerald-700">
-                      Question {currentQuestion + 1} sur {selectedQuiz.questions}
+                      Question {currentQuestion + 1} sur {selectedQuiz.questions?.length || 0}
                     </p>
                     <p className="text-lg font-semibold mt-2">
-                      {selectedQuiz.questionsList?.[currentQuestion]?.question || `Question ${currentQuestion + 1}`}
+                      {selectedQuiz.questions?.[currentQuestion]?.question || `Question ${currentQuestion + 1}`}
                     </p>
                     <div className="mt-4 space-y-2">
-                      {selectedQuiz.questionsList?.[currentQuestion]?.options?.map((option, index) => (
+                      {selectedQuiz.questions?.[currentQuestion]?.options?.map((option, index) => (
                         <label
                           key={`${selectedQuiz._id || 'quiz'}-${currentQuestion}-${index}`}
                           className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${
@@ -203,7 +203,7 @@ function ProgressQuizPage() {
                       ← Précédent
                     </button>
                     
-                    {currentQuestion === (selectedQuiz.questions - 1) ? (
+                    {currentQuestion === ((selectedQuiz.questions?.length || 0) - 1) ? (
                       <button
                         onClick={handleSubmitQuiz}
                         disabled={submitLoading}
@@ -255,28 +255,6 @@ function ProgressQuizPage() {
           </div>
         </div>
       )}
-
-      <header className="bg-white shadow-md border-t-4 border-emerald-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
-            Safoua Academy
-          </Link>
-          
-          <nav className="hidden md:flex space-x-8">
-            <Link to="/cours" className="text-gray-600 hover:text-emerald-600">Catalogue</Link>
-            <Link to="/etudiant" className="text-gray-600 hover:text-emerald-600">Mes cours</Link>
-            <Link to="/progression" className="text-emerald-600 font-semibold">Progression</Link>
-            <Link to="/etudiant/certificats" className="text-gray-600 hover:text-emerald-600">Certificats</Link>
-          </nav>
-          
-          <button 
-            onClick={() => navigate('/etudiant')}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
-          >
-            Mon compte
-          </button>
-        </div>
-      </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
@@ -353,18 +331,7 @@ function ProgressQuizPage() {
                     </div>
                   </div>
 
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl">🔥</span>
-                        <div>
-                          <p className="font-semibold text-amber-800">Série actuelle</p>
-                          <p className="text-sm text-amber-600">{progressData.streak} jours consécutifs</p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-amber-600">Dernière activité: {progressData.lastActive}</p>
-                    </div>
-                  </div>
+                  {/* Série actuelle supprimée */}
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm p-6">
@@ -471,7 +438,7 @@ function ProgressQuizPage() {
                                 }`}></span>
                                 {quiz.difficulty}
                               </span>
-                              <span>❓ {quiz.questions} questions</span>
+                              <span>❓ {Array.isArray(quiz.questions) ? quiz.questions.length : quiz.questions} questions</span>
                               <span>⏱️ {quiz.duration}</span>
                               <span>⭐ {quiz.points} points</span>
                             </div>

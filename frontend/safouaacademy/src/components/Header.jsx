@@ -8,6 +8,7 @@ function Header() {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  const [isMobileCategoriesOpen, setIsMobileCategoriesOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -61,7 +62,9 @@ function Header() {
       "chevron-down": "M19 9l-7 7-7-7",
       "chevron-right": "M9 5l7 7-7 7",
       "mail": "M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
-      "phone": "M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+      "phone": "M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z",
+      "menu": "M4 6h16M4 12h16M4 18h16",
+      "x": "M6 18L18 6M6 6l12 12"
     };
     return (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,15 +77,15 @@ function Header() {
     if (!user) {
       return [
         { to: "/", label: "Accueil" },
-        { to: "/cours", label: location.pathname === "/" ? "Catalogue" : "Cours" },
-        { to: "/login", label: "Connexion" },
+        { to: "/cours", label: "Cours" },
+        { to: "/#contact", label: "Contact", isAnchor: true },
         { to: "/register", label: "Inscription" }
       ];
     }
 
     const baseLinks = [
       { to: "/", label: "Accueil" },
-      { to: "/cours", label: location.pathname === "/" ? "Catalogue" : "Cours" }
+      { to: "/cours", label: "Cours" }
     ];
 
     switch (user.role) {
@@ -130,7 +133,6 @@ function Header() {
   };
 
   const navigationLinks = getNavigationLinks();
-
   const isHomePage = location.pathname === "/";
 
   return (
@@ -139,7 +141,7 @@ function Header() {
         isHomePage ? (
           scrolled 
             ? 'bg-white backdrop-blur-xl shadow-lg border-b border-emerald-100' 
-            : 'bg-white backdrop-blur-md'
+            : 'bg-white/95 backdrop-blur-md'
         ) : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-lg'
       }`}
     >
@@ -150,8 +152,9 @@ function Header() {
             className={`relative transform transition-transform duration-300 hover:scale-105 cursor-pointer ${
               isHomePage ? 'text-emerald-700' : 'text-white'
             }`}
+            onClick={() => navigate("/")}
           >
-            <h1 className="text-3xl font-black">
+            <h1 className="text-2xl sm:text-3xl font-black">
               <span className={`bg-gradient-to-r ${
                 isHomePage 
                   ? 'from-emerald-700 via-emerald-600 to-teal-600 bg-clip-text text-transparent'
@@ -168,9 +171,9 @@ function Header() {
 
           {/* Navigation desktop */}
           <nav className="hidden md:flex items-center space-x-8">
-            {navigationLinks.filter(link => link.to !== "/login" && link.to !== "/register").map((link) => (
-              <div key={link.to} className="transform transition-transform duration-200 hover:-translate-y-1">
-                {link.label === "Catalogue" && isHomePage ? (
+            {navigationLinks.map((link) => (
+              <div key={`${link.to}-${link.label}`} className="transform transition-transform duration-200 hover:-translate-y-1">
+                {link.label === "Cours" && isHomePage ? (
                   <div className="relative">
                     <button
                       onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
@@ -249,49 +252,142 @@ function Header() {
                 </button>
               </>
             ) : (
-              <div className="transform transition-transform duration-200 hover:-translate-y-1">
-                <Link 
-                  to="/login" 
-                  className={`font-semibold relative group ${
-                    isHomePage ? 'text-gray-700 hover:text-emerald-700' : 'text-emerald-100 hover:text-white'
-                  }`}
-                >
-                  Connexion
-                  <span className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all group-hover:w-full ${
-                    isHomePage ? 'bg-emerald-600' : 'bg-white'
-                  }`}></span>
-                </Link>
-              </div>
-            )}
-          </nav>
-
-          {/* Boutons d'action */}
-          <div className="flex gap-3">
-            {user ? (
-              <button
-                onClick={handleDashboardClick}
-                className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-3 rounded-2xl hover:from-emerald-700 hover:to-teal-700 transition-all font-bold shadow-xl transform hover:scale-105 active:scale-95"
-              >
-                Mon espace
-              </button>
-            ) : (
-              <>
+              <div className="flex gap-3">
                 <Link
                   to="/login"
-                  className="px-6 py-3 border-2 border-emerald-600 text-emerald-700 rounded-2xl hover:bg-emerald-50 transition-all font-semibold shadow-md hover:shadow-xl transform hover:scale-105 active:scale-95"
+                  className="px-5 py-2 border-2 border-emerald-600 text-emerald-700 rounded-xl hover:bg-emerald-50 transition-all font-semibold shadow-md hover:shadow-xl transform hover:scale-105 active:scale-95"
                 >
                   Se connecter
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-3 rounded-2xl hover:from-emerald-700 hover:to-teal-700 transition-all font-bold shadow-xl transform hover:scale-105 active:scale-95"
+                  className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all font-bold shadow-xl transform hover:scale-105 active:scale-95"
                 >
                   S'inscrire
                 </Link>
-              </>
+              </div>
             )}
-          </div>
+          </nav>
+
+          {/* Bouton menu mobile */}
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition"
+            aria-label="Menu"
+          >
+            {getIcon(isMenuOpen ? "x" : "menu", "w-6 h-6")}
+          </button>
+
+          {/* Boutons d'action desktop (uniquement quand user connecté) */}
+          {user && (
+            <div className="hidden md:flex gap-3">
+              <button
+                onClick={handleDashboardClick}
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-2 rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all font-bold shadow-xl transform hover:scale-105 active:scale-95"
+              >
+                Mon espace
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Menu mobile */}
+        {isMenuOpen && (
+          <div className="md:hidden mt-4 pt-4 border-t border-gray-200 animate-fadeIn">
+            <div className="flex flex-col space-y-3">
+              {navigationLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`py-2 px-3 rounded-lg font-semibold ${
+                    isHomePage ? 'text-gray-700 hover:bg-gray-100' : 'text-white hover:bg-white/10'
+                  }`}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+              
+              {/* Catégories dans menu mobile */}
+              <div className="pt-2">
+                <button
+                  onClick={() => setIsMobileCategoriesOpen(!isMobileCategoriesOpen)}
+                  className={`w-full text-left py-2 px-3 rounded-lg font-semibold flex items-center justify-between ${
+                    isHomePage ? 'text-gray-700 hover:bg-gray-100' : 'text-white hover:bg-white/10'
+                  }`}
+                >
+                  Catégories
+                  <span className={`transition-transform ${isMobileCategoriesOpen ? 'rotate-180' : ''}`}>
+                    {getIcon("chevron-down", "w-4 h-4")}
+                  </span>
+                </button>
+                {isMobileCategoriesOpen && (
+                  <div className="ml-4 mt-2 space-y-2">
+                    {categories.map((cat) => (
+                      <Link
+                        key={cat.id}
+                        to={cat.link}
+                        className={`block py-2 px-3 rounded-lg text-sm ${
+                          isHomePage ? 'text-gray-600 hover:bg-gray-100' : 'text-white/80 hover:bg-white/10'
+                        }`}
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          setIsMobileCategoriesOpen(false);
+                        }}
+                      >
+                        {cat.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {!user && (
+                <div className="flex flex-col gap-2 pt-2">
+                  <Link
+                    to="/login"
+                    className="py-2 px-3 text-center rounded-lg font-semibold border border-emerald-600 text-emerald-700"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Se connecter
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="py-2 px-3 text-center rounded-lg font-semibold bg-emerald-600 text-white"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    S'inscrire
+                  </Link>
+                </div>
+              )}
+
+              {user && (
+                <>
+                  <button
+                    onClick={() => {
+                      handleDashboardClick();
+                      setIsMenuOpen(false);
+                    }}
+                    className={`py-2 px-3 rounded-lg font-semibold text-left ${
+                      isHomePage ? 'text-emerald-600 hover:bg-gray-100' : 'text-white hover:bg-white/10'
+                    }`}
+                  >
+                    Dashboard
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setIsMenuOpen(false);
+                    }}
+                    className="py-2 px-3 rounded-lg font-semibold text-left text-red-600 hover:bg-gray-100"
+                  >
+                    Déconnexion
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

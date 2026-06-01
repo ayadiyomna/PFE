@@ -90,33 +90,50 @@ class CoursService {
     };
   }
 
-  async getCoursById(id) {
-    try {
-      const response = await api.get(`/cours/${id}`);
-      return {
-        success: true,
-        data: response.data.data || response.data
-      };
-    } catch (error) {
-      console.error(`Erreur getCoursById ${id}:`, error);
+  async getCoursById(id, retries = 2, initialBackoff = 500) {
+    const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-      if (error.isOffline) {
-        const localCourses = JSON.parse(localStorage.getItem("courses") || "[]");
-        const course = localCourses.find((c) => c._id == id || c.id == id);
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const response = await api.get(`/cours/${id}`);
+        return {
+          success: true,
+          data: response.data.data || response.data
+        };
+      } catch (error) {
+        console.error(`Erreur getCoursById ${id} (attempt ${attempt}):`, error);
 
-        if (course) {
+        // If offline fallback, return local course if available
+        if (error.isOffline) {
+          const localCourses = JSON.parse(localStorage.getItem("courses") || "[]");
+          const course = localCourses.find((c) => c._id == id || c.id == id);
+
+          if (course) {
+            return {
+              success: true,
+              data: course,
+              offline: true
+            };
+          }
+
           return {
-            success: true,
-            data: course,
-            offline: true
+            success: false,
+            message: 'Backend non accessible (hors-ligne)'
           };
         }
-      }
 
-      return {
-        success: false,
-        message: error.message || "Cours non trouvé"
-      };
+        // If last attempt, return the error
+        if (attempt === retries) {
+          return {
+            success: false,
+            message: error.message || "Cours non trouvé"
+          };
+        }
+
+        // Otherwise wait with exponential backoff then retry
+        const backoff = initialBackoff * Math.pow(2, attempt);
+        await sleep(backoff);
+      }
     }
   }
 

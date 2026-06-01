@@ -2,11 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorizeRoles } = require('../middlewares/authMiddleware');
 const Cours = require('../models/Cours');
+const Category = require('../models/Category');
 const User = require('../models/User');
 const Progress = require('../models/Progress');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
 
 // Multer setup for resource uploads (pdf, video, audio)
 const resourcesDir = path.join(__dirname, '../uploads/resources');
@@ -85,7 +87,6 @@ router.get('/courslist', async (req, res) => {
 router.get('/admin/courslist', protect, authorizeRoles('admin', 'administrateur'), async (req, res) => {
   try {
     const { categorie, niveau, status, search, page = 1, limit = 20 } = req.query;
-
     let query = {};
 
     if (categorie) query.categorie = categorie;
@@ -124,6 +125,20 @@ router.get('/admin/courslist', protect, authorizeRoles('admin', 'administrateur'
       message: 'Erreur lors de la récupération des cours admin',
       error: error.message
     });
+  }
+});
+
+// Recommandations: Top 5 most recent published courses
+router.get('/recommandations', async (req, res) => {
+  try {
+    const recommandations = await Cours.find({ status: 'Publié' })
+      .sort('-createdAt')
+      .limit(5)
+      .populate('instructeur', 'nom prenom email');
+    res.json({ success: true, data: recommandations });
+  } catch (error) {
+    console.error('Erreur dans /recommandations:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la récupération des recommandations', error: error.message });
   }
 });
 
@@ -413,6 +428,26 @@ router.post('/:id/inscrire', protect, async (req, res) => {
     cours.students.push(req.user._id);
     await cours.save();
 
+    // Création de la notification pour l'enseignant
+    try {
+      const Notification = require('../models/Notification');
+      const User = require('../models/User');
+      // Récupérer l'étudiant pour le nom
+      const etudiant = await User.findById(req.user._id);
+      await Notification.create({
+        utilisateur: cours.instructeur,
+        type: 'inscription',
+        title: 'Nouvelle inscription à votre cours',
+        message: `L'étudiant(e) ${etudiant.prenom} ${etudiant.nom} s'est inscrit(e) à votre cours : "${cours.titre}"`,
+        data: {
+          etudiantId: etudiant._id,
+          coursId: cours._id
+        }
+      });
+    } catch (notifErr) {
+      console.error('Erreur lors de la création de la notification enseignant:', notifErr);
+    }
+
     res.json({
       success: true,
       message: 'Inscription réussie au cours'
@@ -427,6 +462,25 @@ router.post('/:id/inscrire', protect, async (req, res) => {
 });
 
 router.get('/:id', async (req, res) => {
+  // Dev fallback: if MongoDB is not connected, return a mock course quickly
+  if (process.env.NODE_ENV !== 'production' && mongoose.connection.readyState !== 1) {
+    console.log('MongoDB disconnected - returning mock course for', req.params.id);
+    const mockCourse = {
+      _id: req.params.id,
+      titre: 'Cours (mode dev)',
+      description: 'Version de développement — MongoDB non connecté',
+      prix: 0,
+      niveau: 'Démo',
+      instructeur: { prenom: 'Demo', nom: 'Prof' },
+      modules: [],
+      students: [],
+      rating: 0,
+      nombreAvis: 0,
+      updatedAt: new Date()
+    };
+    return res.json({ success: true, data: mockCourse });
+  }
+
   try {
     const cours = await Cours.findById(req.params.id)
       .populate('instructeur', 'nom prenom email')
@@ -777,6 +831,73 @@ router.post('/upload/resource', protect, authorizeRoles('enseignant', 'admin', '
   } catch (error) {
     console.error('Erreur dans POST /upload/resource:', error);
     res.status(400).json({ success: false, message: error.message || 'Erreur lors de l\'upload' });
+  }
+});
+
+// === CATEGORIES CRUD ===
+router.get('/categories/all', async (req, res) => {
+  try {
+    const categories = await Category.find().sort('ordre');
+    res.json({ success: true, data: categories });
+  } catch (error) {
+    console.error('Erreur dans GET /categories/all:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la récupération des catégories', error: error.message });
+  }
+});
+
+router.post('/categories', protect, authorizeRoles('admin', 'administrateur'), async (req, res) => {
+  try {
+    const { nom, description, icon, couleur, ordre } = req.body;
+    if (!nom || !nom.trim()) return res.status(400).json({ success: false, message: 'Le nom de la catégorie est requis' });
+
+    const existing = await Category.findOne({ nom: nom.trim() });
+    if (existing) return res.status(400).json({ success: false, message: 'Cette catégorie existe déjà' });
+
+    const category = new Category({ nom: nom.trim(), description: description || '', icon: icon || '📚', couleur: couleur || '#10b981', ordre: ordre || 0 });
+    await category.save();
+
+    res.status(201).json({ success: true, data: category, message: 'Catégorie créée avec succès' });
+  } catch (error) {
+    console.error('Erreur dans POST /categories:', error);
+    console.error(error.stack);
+    if (error.code === 11000) return res.status(400).json({ success: false, message: 'Cette catégorie existe déjà' });
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de la création de la catégorie' });
+  }
+});
+
+router.put('/categories/:id', protect, authorizeRoles('admin', 'administrateur'), async (req, res) => {
+  try {
+    const { nom, description, icon, couleur, ordre, actif } = req.body;
+    if (!nom || !nom.trim()) return res.status(400).json({ success: false, message: 'Le nom de la catégorie est requis' });
+
+    const existing = await Category.findOne({ nom: nom.trim(), _id: { $ne: req.params.id } });
+    if (existing) return res.status(400).json({ success: false, message: 'Une autre catégorie avec ce nom existe déjà' });
+
+    const category = await Category.findByIdAndUpdate(req.params.id, { nom: nom.trim(), description: description || '', icon: icon || '📚', couleur: couleur || '#10b981', ordre: ordre !== undefined ? ordre : 0, actif: actif !== undefined ? actif : true }, { new: true, runValidators: true });
+
+    if (!category) return res.status(404).json({ success: false, message: 'Catégorie non trouvée' });
+
+    res.json({ success: true, data: category, message: 'Catégorie mise à jour avec succès' });
+  } catch (error) {
+    console.error('Erreur dans PUT /categories/:id:', error);
+    if (error.code === 11000) return res.status(400).json({ success: false, message: 'Une catégorie avec ce nom existe déjà' });
+    res.status(400).json({ success: false, message: error.message || 'Erreur lors de la mise à jour de la catégorie' });
+  }
+});
+
+router.delete('/categories/:id', protect, authorizeRoles('admin', 'administrateur'), async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) return res.status(404).json({ success: false, message: 'Catégorie non trouvée' });
+
+    const coursCount = await Cours.countDocuments({ categorie: category.nom });
+    if (coursCount > 0) return res.status(400).json({ success: false, message: `Impossible de supprimer: ${coursCount} cours utilise(nt) cette catégorie` });
+
+    await category.deleteOne();
+    res.json({ success: true, message: 'Catégorie supprimée avec succès' });
+  } catch (error) {
+    console.error('Erreur dans DELETE /categories/:id:', error);
+    res.status(500).json({ success: false, message: error.message || 'Erreur lors de la suppression de la catégorie' });
   }
 });
 

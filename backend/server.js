@@ -16,6 +16,7 @@ const quizRoutes = require('./routes/quizRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const stripeWebhook = require('./routes/stripeWebhook');
 
 const app = express();
 
@@ -26,6 +27,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Stripe webhook doit utiliser express.raw, donc on le place avant express.json
+app.use('/api/stripe', stripeWebhook);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -144,8 +148,9 @@ mongoose.connect(MONGO_URI)
 
 // Gestion de l'arrêt propre
 process.on('SIGINT', () => {
-  mongoose.connection.close(() => {
-    console.log('🔌 Connexion MongoDB fermée');
-    process.exit(0);
-  });
+  mongoose.connection.close()
+    .then(() => {
+      console.log('🔌 Connexion MongoDB fermée');
+      process.exit(0);
+    });
 });

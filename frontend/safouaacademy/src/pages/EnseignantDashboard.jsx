@@ -14,13 +14,13 @@ function EnseignantDashboard() {
     totalStudents: 0,
     totalCourses: 0,
     averageProgress: 0,
-    revenue: 0,
-    pendingReviews: 0
+    revenue: 0
   });
   const [deleteModal, setDeleteModal] = useState(null);
   const [user, setUser] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactSubject, setContactSubject] = useState('');
   const [contactMessage, setContactMessage] = useState('');
@@ -36,11 +36,6 @@ function EnseignantDashboard() {
   const [accountLoading, setAccountLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-
-  // Agréger tous les avis des cours de l'enseignant
-  const allReviews = (courses || [])
-    .flatMap((course) => (course.avis || []).map((a) => ({ ...a, coursId: course._id, coursTitre: course.titre })))
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   useEffect(() => {
     const userData = authService.getCurrentUser();
@@ -121,6 +116,8 @@ function EnseignantDashboard() {
       console.error("Erreur chargement notifications:", error);
     }
   };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleCreateCourse = () => {
     navigate("/enseignant/creer-cours");
@@ -217,8 +214,6 @@ function EnseignantDashboard() {
       }
     } catch (error) {
       console.error("Erreur chargement étudiants:", error);
-      console.error("Status:", error.response?.status);
-      console.error("Data:", error.response?.data);
       alert("Erreur: " + (error.response?.data?.message || error.message || "Erreur serveur"));
       setStudentsData(null);
     } finally {
@@ -229,15 +224,14 @@ function EnseignantDashboard() {
   const handleExportStudentsCSV = () => {
     if (!studentsData || !studentsData.etudiants) return;
 
-    const headers = ['Nom', 'Prénom', 'Email', 'Date d\'inscription', 'Progression (%)', 'Leçons complétées', 'Note'];
+    const headers = ['Nom', 'Prénom', 'Email', 'Date d\'inscription', 'Progression (%)', 'Leçons complétées'];
     const rows = studentsData.etudiants.map(student => [
       student.nom,
       student.prenom,
       student.email,
       new Date(student.dateInscription).toLocaleDateString('fr-FR'),
       student.progression,
-      student.leçonsCompletées,
-      student.note
+      student.leçonsCompletées
     ]);
 
     let csvContent = headers.join(',') + '\n';
@@ -401,50 +395,7 @@ function EnseignantDashboard() {
         </div>
       )}
 
-      <header className="bg-white shadow-md border-t-4 border-emerald-600 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <Link to="/" className="text-3xl font-extrabold text-emerald-700 tracking-wider">
-            Safoua Academy
-          </Link>
-
-          <nav className="hidden md:flex space-x-8 items-center">
-            <button onClick={() => setActiveTab("cours")} className={`${activeTab === "cours" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Mes cours</button>
-            <button onClick={() => setActiveTab("analytiques")} className={`${activeTab === "analytiques" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Analytiques</button>
-            <button onClick={() => setActiveTab("etudiants")} className={`${activeTab === "etudiants" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Étudiants</button>
-            <button onClick={() => setActiveTab("avis")} className={`${activeTab === "avis" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Avis {stats.pendingReviews ? `(${stats.pendingReviews})` : ''}</button>
-            <button onClick={() => setActiveTab("parametres")} className={`${activeTab === "parametres" ? "text-emerald-600 font-semibold" : "text-gray-600 hover:text-emerald-600"}`}>Paramètres</button>
-            <button onClick={handleLogout} className="text-red-600 hover:text-red-700 font-semibold px-3 py-1 rounded transition">Déconnexion</button>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <button className="p-2 hover:bg-gray-100 rounded-lg relative">
-                <span className="text-xl">🔔</span>
-                {notifications.filter((n) => !n.read).length > 0 && (
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                    {notifications.filter((n) => !n.read).length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 bg-emerald-50 px-3 py-2 rounded-lg">
-              <span className="text-emerald-600">👨‍🏫</span>
-              <span className="text-sm font-semibold text-gray-700">
-                {user?.prenom || user?.name || "Enseignant"}
-              </span>
-            </div>
-
-            <button onClick={() => setActiveTab("parametres")} className="text-sm bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold">
-              Mon compte
-            </button>
-
-            <button onClick={handleLogout} className="md:hidden p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Déconnexion">
-              🚪
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* HEADER INTERNE SUPPRIMÉ */}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -461,10 +412,70 @@ function EnseignantDashboard() {
               })}
             </p>
           </div>
-          {/* Le bouton "+ Créer un cours" a été retiré pour les enseignants; création gérée via l'administration */}
+          <div className="flex items-center gap-3 relative">
+            <button
+              onClick={() => navigate('/compte')}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold"
+            >
+              Mon compte
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowNotificationsMenu((prev) => !prev)}
+                className="relative bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-50 transition font-semibold flex items-center gap-2"
+              >
+                <span className="text-lg">🔔</span>
+                Notifications
+                {unreadCount > 0 && (
+                  <span className="absolute -top-2 -right-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotificationsMenu && (
+                <div className="absolute right-0 z-50 mt-2 w-80 max-h-96 overflow-hidden overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+                  <div className="border-b border-slate-200 px-4 py-3 font-semibold text-slate-900">
+                    Notifications
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-4 text-sm text-slate-500">Aucune notification pour le moment.</div>
+                  ) : (
+                    notifications.map((notif) => (
+                      <button
+                        key={notif._id}
+                        onClick={() => markNotificationAsRead(notif._id)}
+                        className={`w-full text-left px-4 py-3 transition hover:bg-slate-50 ${notif.read ? 'bg-white' : 'bg-slate-50'}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-900">{notif.title}</p>
+                          {!notif.read && <span className="inline-flex rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">Nouveau</span>}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-600">{notif.message}</p>
+                        <p className="mt-2 text-xs text-slate-400">{new Date(notif.createdAt).toLocaleString('fr-FR')}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => { setShowContactModal(true); setContactResult(null); }}
+              className="bg-slate-100 text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-200 transition font-semibold border border-slate-200"
+            >
+              Contacter l'administrateur
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-semibold"
+            >
+              Déconnexion
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition">
             <p className="text-sm text-gray-500">Total étudiants</p>
             <p className="text-2xl font-bold text-emerald-600">{stats.totalStudents.toLocaleString()}</p>
@@ -481,10 +492,39 @@ function EnseignantDashboard() {
             <p className="text-sm text-gray-500">Revenus (DT)</p>
             <p className="text-2xl font-bold text-emerald-600">{stats.revenue.toLocaleString()}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition">
-            <p className="text-sm text-gray-500">Avis en attente</p>
-            <p className="text-2xl font-bold text-amber-600">{stats.pendingReviews}</p>
-          </div>
+        </div>
+
+        <div className="flex items-center gap-4 mb-6 border-b border-gray-200">
+          <button 
+            onClick={() => setActiveTab("cours")}
+            className={`px-6 py-3 font-semibold transition ${
+              activeTab === "cours" 
+                ? "text-emerald-600 border-b-2 border-emerald-600" 
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Mes cours ({courses.length})
+          </button>
+          <button 
+            onClick={() => setActiveTab("analytiques")}
+            className={`px-6 py-3 font-semibold transition ${
+              activeTab === "analytiques" 
+                ? "text-emerald-600 border-b-2 border-emerald-600" 
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Analytiques
+          </button>
+          <button 
+            onClick={() => setActiveTab("etudiants")}
+            className={`px-6 py-3 font-semibold transition ${
+              activeTab === "etudiants" 
+                ? "text-emerald-600 border-b-2 border-emerald-600" 
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Étudiants
+          </button>
         </div>
 
         {loading ? (
@@ -697,7 +737,6 @@ function EnseignantDashboard() {
                                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Date inscription</th>
                                     <th className="text-center py-3 px-4 font-semibold text-gray-700">Progression</th>
                                     <th className="text-center py-3 px-4 font-semibold text-gray-700">Leçons</th>
-                                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Note</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -728,11 +767,6 @@ function EnseignantDashboard() {
                                       <td className="py-3 px-4 text-center">
                                         <span className="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold">
                                           {student.leçonsCompletées}
-                                        </span>
-                                      </td>
-                                      <td className="py-3 px-4 text-center">
-                                        <span className="inline-block text-xs font-semibold">
-                                          {student.note ? `${student.note.toFixed(1)}/20` : 'N/A'}
                                         </span>
                                       </td>
                                     </tr>
@@ -776,127 +810,6 @@ function EnseignantDashboard() {
                 )}
               </div>
             )}
-
-            {activeTab === "avis" && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Avis des étudiants</h2>
-
-                {allReviews.length > 0 ? (
-                  <div className="space-y-4">
-                    {allReviews.map((review, idx) => (
-                      <div key={review._id || idx} className="border border-gray-100 rounded-lg p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <div className="flex items-center gap-3">
-                              <span className="font-semibold text-gray-900">{review.utilisateur?.prenom || review.utilisateur?.nom ? `${review.utilisateur?.prenom || ''} ${review.utilisateur?.nom || ''}` : 'Utilisateur'}</span>
-                              <span className="text-sm text-gray-500">sur</span>
-                              <span className="font-medium text-emerald-600">{review.coursTitre || 'Cours'}</span>
-                            </div>
-                            <div className="flex items-center gap-1 mt-2">
-                              {[...Array(5)].map((_, i) => (
-                                <span key={i} className={i < review.note ? "text-yellow-400" : "text-gray-300"}>★</span>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="text-sm text-gray-500">{new Date(review.date).toLocaleDateString('fr-FR')}</div>
-                        </div>
-                        <p className="text-gray-700">{review.commentaire || '(pas de commentaire)'}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-center py-6">Aucun avis trouvé pour l'instant.</p>
-                )}
-              </div>
-            )}
-
-            {activeTab === "parametres" && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-6">Paramètres du compte</h2>
-
-                {accountMessage && (
-                  <div className={`mb-4 p-3 rounded ${accountMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
-                    {accountMessage.text}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-1 bg-gray-50 p-4 rounded-lg flex flex-col items-center gap-4">
-                    <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center">
-                      {user?.image ? (
-                        <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.image}`} alt="Profil" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-4xl">👤</span>
-                      )}
-                    </div>
-
-                    <div className="w-full text-center">
-                      <input id="enseignant-profile-image" type="file" accept="image/*" onChange={handleUploadProfileImage} className="hidden" />
-                      <label htmlFor="enseignant-profile-image" className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${imageUploading ? 'bg-gray-200 text-gray-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                        {imageUploading ? 'Téléversement...' : 'Changer la photo'}
-                      </label>
-                      <p className="text-xs text-gray-500 mt-3">Format: JPG/PNG/GIF — Max 5MB</p>
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <div className="bg-white p-4 rounded-lg border border-gray-100">
-                      <h3 className="text-lg font-semibold mb-4">Informations personnelles</h3>
-                      <form onSubmit={handleUpdateAccount} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Nom</label>
-                            <input name="nom" value={accountFormData.nom} onChange={handleAccountInputChange} className="w-full px-3 py-2 border rounded" />
-                          </div>
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Prénom</label>
-                            <input name="prenom" value={accountFormData.prenom} onChange={handleAccountInputChange} className="w-full px-3 py-2 border rounded" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">Email</label>
-                          <input name="email" value={accountFormData.email} onChange={handleAccountInputChange} className="w-full px-3 py-2 border rounded" />
-                        </div>
-
-                        <div className="flex gap-3">
-                          <button disabled={accountLoading} type="submit" className={`px-4 py-2 rounded-lg font-semibold ${accountLoading ? 'bg-gray-200 text-gray-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                            {accountLoading ? 'Enregistrement...' : 'Enregistrer les modifications'}
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-lg border border-gray-100 mt-6">
-                      <h3 className="text-lg font-semibold mb-4">Sécurité — changer le mot de passe</h3>
-                      <form onSubmit={handleChangePassword} className="space-y-4">
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">Mot de passe actuel</label>
-                          <input name="currentPassword" type="password" value={passwordFormData.currentPassword} onChange={handlePasswordInputChange} className="w-full px-3 py-2 border rounded" />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Nouveau mot de passe</label>
-                            <input name="newPassword" type="password" value={passwordFormData.newPassword} onChange={handlePasswordInputChange} className="w-full px-3 py-2 border rounded" />
-                          </div>
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Confirmer le mot de passe</label>
-                            <input name="confirmPassword" type="password" value={passwordFormData.confirmPassword} onChange={handlePasswordInputChange} className="w-full px-3 py-2 border rounded" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <button disabled={passwordLoading} type="submit" className={`px-4 py-2 rounded-lg font-semibold ${passwordLoading ? 'bg-gray-200 text-gray-700' : 'bg-amber-600 text-white hover:bg-amber-700'}`}>
-                            {passwordLoading ? 'Mise à jour...' : 'Modifier le mot de passe'}
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
           </>
         )}
       </main>
