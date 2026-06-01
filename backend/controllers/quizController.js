@@ -123,34 +123,27 @@ const submitQuiz = async (req, res) => {
       completedAt: new Date()
     });
     
-    // Génération automatique du certificat si conditions réunies
+    // Génération automatique du certificat si quiz réussi
     let certificatGenere = null;
     if (passed) {
-      // Vérifier la progression de l'étudiant sur ce cours
-      const progress = await require('../models/Progress').findOne({
-        utilisateur: userId,
-        cours: quiz.cours
-      });
-      if (progress && progress.progress === 100) {
-        // Vérifier qu'il n'a pas déjà un certificat
-        const Certificat = require('../models/Certificat');
-        const existingCert = await Certificat.findOne({ utilisateur: userId, cours: quiz.cours });
-        if (!existingCert) {
-          // Générer un code unique pour le certificat
-          const prefix = 'SAF';
-          const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-          const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-          const code = `${prefix}-${date}-${random}`;
-          
-          // Générer le certificat
-          certificatGenere = await Certificat.create({
-            utilisateur: userId,
-            cours: quiz.cours,
-            code,
-            score,
-            dateDelivrance: new Date()
-          });
-        }
+      // Vérifier qu'il n'a pas déjà un certificat pour ce cours
+      const Certificat = require('../models/Certificat');
+      const existingCert = await Certificat.findOne({ utilisateur: userId, cours: quiz.cours });
+      if (!existingCert) {
+        // Générer un code unique pour le certificat
+        const prefix = 'SAF';
+        const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const code = `${prefix}-${date}-${random}`;
+        
+        // Générer le certificat
+        certificatGenere = await Certificat.create({
+          utilisateur: userId,
+          cours: quiz.cours,
+          code,
+          score,
+          dateDelivrance: new Date()
+        });
       }
     }
 

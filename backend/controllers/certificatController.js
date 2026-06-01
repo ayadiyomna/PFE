@@ -1,6 +1,125 @@
 const Certificat = require('../models/Certificat');
 const Cours = require('../models/Cours');
 const User = require('../models/User');
+const PDFDocument = require('pdfkit');
+
+/**
+ * Générer un PDF du certificat
+ */
+const generateCertificatePDF = (certificate, userInfo, courseInfo) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50
+      });
+
+      let pdfBuffer = [];
+      
+      doc.on('data', (chunk) => {
+        pdfBuffer.push(chunk);
+      });
+
+      doc.on('end', () => {
+        const buffer = Buffer.concat(pdfBuffer);
+        resolve(buffer);
+      });
+
+      doc.on('error', (err) => {
+        reject(err);
+      });
+
+      // Add background color
+      doc.rect(0, 0, 595, 842).fill('#f8f9fa');
+
+      // Add decorative border
+      doc.strokeColor('#2d9d6c').lineWidth(3);
+      doc.rect(30, 30, 535, 782).stroke();
+
+      doc.strokeColor('#d4af37').lineWidth(1);
+      doc.rect(35, 35, 525, 772).stroke();
+
+      // Title - Certificat
+      doc.fillColor('#2d9d6c').fontSize(48).font('Helvetica-Bold').text('CERTIFICAT', 0, 100, {
+        align: 'center'
+      });
+
+      // Subtitle
+      doc.fillColor('#555555').fontSize(14).font('Helvetica').text('DE RÉUSSITE', 0, 160, {
+        align: 'center'
+      });
+
+      // Decorative line
+      doc.moveTo(150, 190).lineTo(445, 190).stroke('#d4af37');
+
+      // Main text
+      doc.fontSize(12).fillColor('#333333').font('Helvetica').text('Nous certifions par la présente que', 0, 220, {
+        align: 'center'
+      });
+
+      // Student name
+      doc.fontSize(28).font('Helvetica-Bold').fillColor('#2d9d6c').text(
+        userInfo.nom && userInfo.prenom 
+          ? `${userInfo.prenom} ${userInfo.nom}`.toUpperCase()
+          : 'ÉTUDIANT',
+        0, 260,
+        { align: 'center' }
+      );
+
+      // Course completion text
+      doc.fontSize(12).font('Helvetica').fillColor('#333333');
+      doc.text('a complété avec succès le cours', 0, 320, { align: 'center' });
+
+      // Course title
+      doc.fontSize(18).font('Helvetica-Bold').fillColor('#2d9d6c').text(
+        courseInfo.titre || 'Cours Safoua Academy',
+        0, 355,
+        { align: 'center', width: 495 }
+      );
+
+      // Course details
+      doc.fontSize(11).font('Helvetica').fillColor('#555555');
+      doc.text(`Niveau: ${courseInfo.niveau || 'Intermédiaire'}`, 0, 420, { align: 'center' });
+
+      // Score
+      doc.text(`Score obtenu: ${certificate.score}%`, 0, 445, { align: 'center' });
+
+      // Certificate code
+      doc.fontSize(10).fillColor('#888888');
+      doc.text(`Certificat n°: ${certificate.code}`, 0, 510, { align: 'center' });
+
+      // Date
+      const options = { year: 'numeric', month: 'long', day: 'numeric', locale: 'fr-FR' };
+      const dateStr = new Date(certificate.dateDelivrance).toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      doc.text(`Délivré le: ${dateStr}`, 0, 530, { align: 'center' });
+
+      // Instructor section
+      doc.fontSize(10).fillColor('#333333').text('Délivré par:', 50, 600);
+      doc.fontSize(12).font('Helvetica-Bold').text(
+        courseInfo.instructeur && courseInfo.instructeur.prenom && courseInfo.instructeur.nom
+          ? `${courseInfo.instructeur.prenom} ${courseInfo.instructeur.nom}`
+          : 'Safoua Academy',
+        50, 625
+      );
+
+      // Footer text
+      doc.fontSize(9).font('Helvetica').fillColor('#888888').text(
+        'Ce certificat atteste de la réussite du cours et de l\'acquisition des compétences requises.',
+        50, 720,
+        { align: 'center', width: 495 }
+      );
+
+      // End document
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
 
 /**
  * Récupérer les certificats de l'utilisateur connecté
@@ -138,7 +257,11 @@ const downloadCertificat = async (req, res) => {
     
     const certificat = await Certificat.findOne({ code })
       .populate('utilisateur', 'nom prenom')
-      .populate('cours', 'titre niveau prix');
+      .populate('cours', 'titre niveau prix instructeur')
+      .populate({
+        path: 'cours',
+        populate: { path: 'instructeur', select: 'nom prenom' }
+      });
     
     if (!certificat) {
       return res.status(404).json({
@@ -148,21 +271,30 @@ const downloadCertificat = async (req, res) => {
     }
     
     // Vérifier les droits (seul le propriétaire ou admin peut télécharger)
-    if (certificat.utilisateur._id.toString() !== req.user._id.toString() && req.user.role !== 'administrateur') {
+    if (certificat.utilisateur._id.toString() !== req.user._id.toString() && req.user.role !== 'administrateur' && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Non autorisé'
       });
     }
     
-    // Générer le PDF (à implémenter avec une lib comme pdfkit)
-    // Pour l'instant, on retourne les données du certificat
+    // Générer le PDF
+    const pdfBuffer = await generateCertificatePDF(
+      certificat,
+      certificat.utilisateur,
+      certificat.cours
+    );
     
-    res.json({
-      success: true,
-      data: certificat,
-      message: 'Certificat disponible'
-    });
+    // Définir les headers pour le téléchargement
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="Certificat-${certificat.utilisateur.prenom}-${certificat.utilisateur.nom}-${certificat.code}.pdf"`
+    );
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    // Envoyer le PDF
+    res.send(pdfBuffer);
   } catch (error) {
     console.error('Erreur downloadCertificat:', error);
     res.status(500).json({
@@ -175,5 +307,6 @@ const downloadCertificat = async (req, res) => {
 module.exports = {
   getMyCertificats,
   generateCertificat,
-  downloadCertificat
+  downloadCertificat,
+  generateCertificatePDF
 };

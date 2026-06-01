@@ -88,8 +88,6 @@ function LessonPlayer() {
           first.prevLesson = null;
           setLesson(first);
         }
-        
-        toast.success("📚 Leçon chargée");
       } catch (apiError) {
         console.log("API non disponible, chargement des données locales");
         
@@ -127,7 +125,6 @@ function LessonPlayer() {
       }
     } catch (error) {
       console.error("Erreur chargement leçon:", error);
-      toast.error("❌ Erreur lors du chargement de la leçon");
     } finally {
       setLoading(false);
     }
@@ -248,7 +245,6 @@ function LessonPlayer() {
     if (videoRef.current) {
       videoRef.current.playbackRate = nextRate;
       setPlaybackRate(nextRate);
-      toast.info(`⏩ Vitesse: ${nextRate}x`);
     }
   };
 
@@ -270,13 +266,9 @@ function LessonPlayer() {
       });
       
       if (newCompleted) {
-        toast.success("✅ Leçon marquée comme terminée !");
-        
         // Vérifier si toutes les leçons sont terminées
         const progressData = response.data.data;
         if (progressData?.progress === 100) {
-          toast.success("🎉 Félicitations ! Vous avez terminé toutes les leçons !");
-          
           setTimeout(() => {
             // Le quiz final ne s'ouvre plus automatiquement via une alerte.
             // L'utilisateur reste sur la page de leçon après avoir terminé toutes les leçons.
@@ -285,7 +277,6 @@ function LessonPlayer() {
       }
     } catch (error) {
       console.error('Erreur mise à jour progression:', error);
-      toast.error("Erreur de sauvegarde de la progression");
     }
   };
 
@@ -311,7 +302,6 @@ function LessonPlayer() {
   const handleSaveNotes = () => {
     localStorage.setItem(`notes-${courseId}-${lessonId}`, notes);
     setShowNotes(false);
-    toast.success("📝 Notes sauvegardées !");
   };
 
   const handleAddBookmark = () => {
@@ -331,14 +321,12 @@ function LessonPlayer() {
     
     setShowBookmarkModal(false);
     setBookmarkNote("");
-    toast.success("🔖 Marque-page ajouté !");
   };
 
   const handleJumpToBookmark = (time) => {
     if (videoRef.current) {
       videoRef.current.currentTime = time;
       setCurrentTime(time);
-      toast.info(`⏩ Position: ${formatTime(time)}`);
     }
   };
 
@@ -346,21 +334,15 @@ function LessonPlayer() {
     const updated = bookmarks.filter(b => b.id !== bookmarkId);
     setBookmarks(updated);
     localStorage.setItem(`bookmarks-${courseId}-${lessonId}`, JSON.stringify(updated));
-    toast.info("🔖 Marque-page supprimé");
   };
 
   const handleDownloadResource = (resource) => {
-    toast.info(`📥 Téléchargement de ${resource.title}...`);
-    setTimeout(() => {
-      toast.success(`✅ ${resource.title} téléchargé !`);
-    }, 1000);
   };
 
   const handleSpeedChange = (rate) => {
     if (videoRef.current) {
       videoRef.current.playbackRate = rate;
       setPlaybackRate(rate);
-      toast.info(`⏩ Vitesse: ${rate}x`);
     }
   };
 
@@ -499,9 +481,6 @@ function LessonPlayer() {
                 onPause={() => setIsPlaying(false)}
                 onEnded={() => {
                   setIsPlaying(false);
-                  if (!completed) {
-                    toast.success("🎉 Leçon terminée !");
-                  }
                 }}
               />
               

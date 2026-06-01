@@ -29,6 +29,9 @@ function ProgressQuizPage() {
   const [quizResult, setQuizResult] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [certificateData, setCertificateData] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -101,6 +104,12 @@ function ProgressQuizPage() {
 
       setQuizResult(response.data.data);
 
+      // If certificate was generated, show certificate modal
+      if (response.data.data?.passed && response.data.data?.certificat) {
+        setCertificateData(response.data.data.certificat);
+        setShowCertificateModal(true);
+      }
+
       // Recharger les données
       loadQuizHistory();
       loadAvailableQuizzes();
@@ -117,6 +126,40 @@ function ProgressQuizPage() {
     setShowQuizModal(false);
     setSelectedQuiz(null);
     setQuizResult(null);
+  };
+
+  const handleDownloadCertificate = async () => {
+    if (!certificateData?.code) return;
+
+    try {
+      setDownloadingPdf(true);
+      const response = await api.get(`/certificats/${certificateData.code}/pdf`, {
+        responseType: 'blob'
+      });
+
+      // Create blob and trigger download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `Certificat-${certificateData.cours?.titre || 'Cours'}-${certificateData.code}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erreur téléchargement certificat:', error);
+      alert('Erreur lors du téléchargement du certificat');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleCloseCertificateModal = () => {
+    setShowCertificateModal(false);
+    setCertificateData(null);
   };
 
   const handleRetryQuiz = (quizId) => {
@@ -251,6 +294,77 @@ function ProgressQuizPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Certificate Modal */}
+      {showCertificateModal && certificateData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full">
+            <div className="p-8">
+              <button
+                onClick={handleCloseCertificateModal}
+                className="float-right text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ✕
+              </button>
+
+              <div className="text-center mb-6">
+                <div className="text-7xl mb-4">🎓</div>
+                <h2 className="text-3xl font-bold text-emerald-600 mb-2">Certificat Obtenu!</h2>
+                <p className="text-gray-600">Félicitations pour votre réussite</p>
+              </div>
+
+              <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg p-6 mb-6 border-2 border-emerald-200">
+                <div className="text-center space-y-3">
+                  <div>
+                    <p className="text-sm text-gray-600">Cours complété</p>
+                    <p className="text-lg font-bold text-gray-900">{certificateData.cours?.titre || 'Cours'}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-emerald-200">
+                    <div>
+                      <p className="text-xs text-gray-600">Score</p>
+                      <p className="text-2xl font-bold text-emerald-600">{certificateData.score}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Code</p>
+                      <p className="text-sm font-mono font-bold text-gray-900">{certificateData.code}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleDownloadCertificate}
+                  disabled={downloadingPdf}
+                  className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition font-semibold flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait"
+                >
+                  {downloadingPdf ? (
+                    <>
+                      <span className="animate-spin">⌛</span>
+                      Téléchargement...
+                    </>
+                  ) : (
+                    <>
+                      📥 Télécharger le PDF
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleCloseCertificateModal}
+                  className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition font-semibold"
+                >
+                  Continuer
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 text-center mt-4">
+                Vous pouvez retrouver ce certificat dans votre page "Mes certificats"
+              </p>
             </div>
           </div>
         </div>
