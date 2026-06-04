@@ -187,6 +187,7 @@ router.post("/", async (req, res) => {
 
     let buffer = "";
     let tokenCount = 0;
+    let sentLength = 0;
 
     ollamaRes.data.on("data", (chunk) => {
       buffer += chunk.toString();
@@ -201,8 +202,14 @@ router.post("/", async (req, res) => {
           const json = JSON.parse(line);
           
           if (json.response) {
-            tokenCount++;
-            res.write(`data: ${JSON.stringify({ token: json.response })}\n\n`);
+            // Envoyer seulement la nouvelle partie du texte cumulatif
+            const currentLength = json.response.length;
+            if (currentLength > sentLength) {
+              const newToken = json.response.substring(sentLength);
+              tokenCount++;
+              res.write(`data: ${JSON.stringify({ token: newToken })}\n\n`);
+              sentLength = currentLength;
+            }
           }
           
           if (json.done) {

@@ -37,9 +37,8 @@ const aiModelSchema = new mongoose.Schema({
 });
 
 // Mettre à jour la date de modification
-aiModelSchema.pre('save', function(next) {
+aiModelSchema.pre('save', function () {
   this.updatedAt = Date.now();
-  next();
 });
 
 module.exports = mongoose.model('AIModel', aiModelSchema);

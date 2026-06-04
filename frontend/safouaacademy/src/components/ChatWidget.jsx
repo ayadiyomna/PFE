@@ -20,12 +20,7 @@ const ChatWidget = () => {
   const [ollamaStatus, setOllamaStatus] = useState(null);
   const [theme, setTheme] = useState('light');
   const [language, setLanguage] = useState('fr');
-  const [suggestedQuestions] = useState([
-    { fr: "Comment apprendre le Tajwid ?", ar: "كيف أتعلم التجويد؟" },
-    { fr: "Cours d'arabe pour débutants", ar: "دورات اللغة العربية للمبتدئين" },
-    { fr: "Histoire des prophètes", ar: "قصص الأنبياء" },
-    { fr: "Apprendre le Fiqh", ar: "تعلم الفقه" }
-  ]);
+
   
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -133,7 +128,7 @@ const ChatWidget = () => {
                   return newMessages;
                 });
               }
-              
+
               if (parsed.done) {
                 setIsLoading(false);
               }
@@ -177,10 +172,7 @@ const ChatWidget = () => {
     ]);
   };
 
-  const handleSuggestionClick = (suggestion) => {
-    setInputMessage(language === 'fr' ? suggestion.fr : suggestion.ar);
-    setTimeout(() => handleSendMessage(), 100);
-  };
+
 
   const formatTime = (date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -357,26 +349,7 @@ const ChatWidget = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggestions de questions */}
-          {messages.length < 3 && (
-            <div className="px-5 py-3 bg-emerald-50/50 border-t border-emerald-100">
-              <p className="text-xs text-emerald-700 mb-2 flex items-center gap-1">
-                <HelpCircle size={12} />
-                Suggestions :
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {suggestedQuestions.map((q, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestionClick(q)}
-                    className="text-xs bg-white hover:bg-emerald-50 text-gray-700 px-3 py-1.5 rounded-full border border-emerald-200 transition-all duration-300 hover:shadow-md"
-                  >
-                    {language === 'fr' ? q.fr : q.ar}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+
 
           {/* Input */}
           <div className="p-5 border-t border-gray-100 bg-white rounded-b-3xl">

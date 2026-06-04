@@ -11,7 +11,7 @@ const generateCertificatePDF = (certificate, userInfo, courseInfo) => {
     try {
       const doc = new PDFDocument({
         size: 'A4',
-        margin: 50
+        margin: 40
       });
 
       let pdfBuffer = [];
@@ -29,91 +29,111 @@ const generateCertificatePDF = (certificate, userInfo, courseInfo) => {
         reject(err);
       });
 
-      // Add background color
-      doc.rect(0, 0, 595, 842).fill('#f8f9fa');
+      const pageWidth = doc.page.width;
+      const pageHeight = doc.page.height;
+      const borderMargin = 30;
 
-      // Add decorative border
-      doc.strokeColor('#2d9d6c').lineWidth(3);
-      doc.rect(30, 30, 535, 782).stroke();
+      // Background
+      doc.rect(0, 0, pageWidth, pageHeight).fill('#f2f7f5');
 
-      doc.strokeColor('#d4af37').lineWidth(1);
-      doc.rect(35, 35, 525, 772).stroke();
+      // Outer border
+      doc.save();
+      doc.lineWidth(4).strokeColor('#1f7a5f');
+      doc.roundedRect(borderMargin, borderMargin, pageWidth - borderMargin * 2, pageHeight - borderMargin * 2, 20).stroke();
+      doc.restore();
 
-      // Title - Certificat
-      doc.fillColor('#2d9d6c').fontSize(48).font('Helvetica-Bold').text('CERTIFICAT', 0, 100, {
+      // Inner card
+      doc.save();
+      doc.roundedRect(borderMargin + 8, borderMargin + 8, pageWidth - (borderMargin + 8) * 2, pageHeight - (borderMargin + 8) * 2, 16);
+      doc.fillOpacity(0.92).fill('#ffffff');
+      doc.restore();
+
+      // Top banner
+      doc.save();
+      doc.roundedRect(borderMargin + 20, borderMargin + 20, pageWidth - (borderMargin + 20) * 2, 90, 16);
+      doc.fill('#1f7a5f');
+      doc.restore();
+
+      doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold').text('SAFOUA ACADEMY', borderMargin + 40, borderMargin + 35);
+      doc.fontSize(10).font('Helvetica').text('Plateforme de formation en ligne', borderMargin + 40, borderMargin + 58);
+
+      const titleY = borderMargin + 140;
+      doc.fillColor('#1f7a5f').fontSize(44).font('Helvetica-Bold').text('CERTIFICAT', 0, titleY, {
+        align: 'center'
+      });
+      doc.fillColor('#2d9d6c').fontSize(16).font('Helvetica').text('DE RÉUSSITE', 0, titleY + 55, {
         align: 'center'
       });
 
-      // Subtitle
-      doc.fillColor('#555555').fontSize(14).font('Helvetica').text('DE RÉUSSITE', 0, 160, {
+      doc.moveTo(pageWidth * 0.2, titleY + 95).lineTo(pageWidth * 0.8, titleY + 95).lineWidth(2).stroke('#d4af37');
+
+      doc.fontSize(12).fillColor('#4b5563').font('Helvetica').text('Nous certifions par la présente que', 0, titleY + 115, {
         align: 'center'
       });
 
-      // Decorative line
-      doc.moveTo(150, 190).lineTo(445, 190).stroke('#d4af37');
+      const studentName = userInfo.nom && userInfo.prenom
+        ? `${userInfo.prenom} ${userInfo.nom}`.toUpperCase()
+        : 'ÉTUDIANT SAFouA';
 
-      // Main text
-      doc.fontSize(12).fillColor('#333333').font('Helvetica').text('Nous certifions par la présente que', 0, 220, {
+      doc.fontSize(30).font('Helvetica-Bold').fillColor('#0f5132').text(studentName, 0, titleY + 145, {
+        align: 'center',
+        characterSpacing: 1
+      });
+
+      doc.fontSize(12).font('Helvetica').fillColor('#4b5563').text('a complété avec succès le programme suivant :', 0, titleY + 200, {
         align: 'center'
       });
 
-      // Student name
-      doc.fontSize(28).font('Helvetica-Bold').fillColor('#2d9d6c').text(
-        userInfo.nom && userInfo.prenom 
-          ? `${userInfo.prenom} ${userInfo.nom}`.toUpperCase()
-          : 'ÉTUDIANT',
-        0, 260,
-        { align: 'center' }
-      );
+      const courseTitle = courseInfo.titre || 'Cours Safoua Academy';
+      doc.fontSize(20).font('Helvetica-Bold').fillColor('#1f7a5f').text(courseTitle, 80, titleY + 235, {
+        align: 'center',
+        width: pageWidth - 160
+      });
 
-      // Course completion text
-      doc.fontSize(12).font('Helvetica').fillColor('#333333');
-      doc.text('a complété avec succès le cours', 0, 320, { align: 'center' });
+      const detailTop = titleY + 300;
+      const durationHours = Math.round((courseInfo.dureeTotale || 0) / 60);
 
-      // Course title
-      doc.fontSize(18).font('Helvetica-Bold').fillColor('#2d9d6c').text(
-        courseInfo.titre || 'Cours Safoua Academy',
-        0, 355,
-        { align: 'center', width: 495 }
-      );
+      doc.fontSize(11).font('Helvetica').fillColor('#4b5563');
+      doc.text(`Niveau : ${courseInfo.niveau || 'Intermédiaire'}`, borderMargin + 60, detailTop, { width: 220 });
+      doc.text(`Score obtenu : ${certificate.score || 0}%`, borderMargin + 60, detailTop + 20, { width: 220 });
+      doc.text(`Durée estimée : ${durationHours || 0} heures`, borderMargin + 60, detailTop + 40, { width: 220 });
 
-      // Course details
-      doc.fontSize(11).font('Helvetica').fillColor('#555555');
-      doc.text(`Niveau: ${courseInfo.niveau || 'Intermédiaire'}`, 0, 420, { align: 'center' });
-
-      // Score
-      doc.text(`Score obtenu: ${certificate.score}%`, 0, 445, { align: 'center' });
-
-      // Certificate code
-      doc.fontSize(10).fillColor('#888888');
-      doc.text(`Certificat n°: ${certificate.code}`, 0, 510, { align: 'center' });
-
-      // Date
-      const options = { year: 'numeric', month: 'long', day: 'numeric', locale: 'fr-FR' };
-      const dateStr = new Date(certificate.dateDelivrance).toLocaleDateString('fr-FR', {
+      doc.text(`Date de délivrance : ${new Date(certificate.dateDelivrance).toLocaleDateString('fr-FR', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-      });
-      doc.text(`Délivré le: ${dateStr}`, 0, 530, { align: 'center' });
+      })}`, pageWidth - borderMargin - 280, detailTop, { width: 220, align: 'right' });
 
-      // Instructor section
-      doc.fontSize(10).fillColor('#333333').text('Délivré par:', 50, 600);
-      doc.fontSize(12).font('Helvetica-Bold').text(
-        courseInfo.instructeur && courseInfo.instructeur.prenom && courseInfo.instructeur.nom
-          ? `${courseInfo.instructeur.prenom} ${courseInfo.instructeur.nom}`
-          : 'Safoua Academy',
-        50, 625
+      const instructorName = courseInfo.instructeur && courseInfo.instructeur.prenom && courseInfo.instructeur.nom
+        ? `${courseInfo.instructeur.prenom} ${courseInfo.instructeur.nom}`
+        : 'Safoua Academy';
+
+      doc.text(`Instructeur : ${instructorName}`, pageWidth - borderMargin - 280, detailTop + 20, { width: 220, align: 'right' });
+      doc.text(`Certification : ${certificate.code}`, pageWidth - borderMargin - 280, detailTop + 40, { width: 220, align: 'right' });
+
+      // Signature area
+      const signatureY = detailTop + 110;
+      doc.moveTo(borderMargin + 90, signatureY).lineTo(borderMargin + 260, signatureY).lineWidth(1).stroke('#9ca3af');
+      doc.fontSize(10).fillColor('#6b7280').text('Signature du formateur', borderMargin + 90, signatureY + 8, { width: 170, align: 'center' });
+
+      doc.moveTo(pageWidth - borderMargin - 260, signatureY).lineTo(pageWidth - borderMargin - 90, signatureY).lineWidth(1).stroke('#9ca3af');
+      doc.text('Cachet officiel', pageWidth - borderMargin - 260, signatureY + 8, { width: 170, align: 'center' });
+
+      // Footer note
+      doc.fontSize(9).fillColor('#6b7280').text(
+        'Ce certificat atteste de la réussite du cours et de l’acquisition des compétences requises sur Safoua Academy.',
+        borderMargin + 50,
+        pageHeight - borderMargin - 80,
+        { width: pageWidth - (borderMargin + 50) * 2, align: 'center' }
       );
 
-      // Footer text
-      doc.fontSize(9).font('Helvetica').fillColor('#888888').text(
-        'Ce certificat atteste de la réussite du cours et de l\'acquisition des compétences requises.',
-        50, 720,
-        { align: 'center', width: 495 }
+      doc.fontSize(9).fillColor('#9ca3af').text(
+        'Vérification du certificat : safouaacademy.com',
+        borderMargin + 50,
+        pageHeight - borderMargin - 55,
+        { width: pageWidth - (borderMargin + 50) * 2, align: 'center' }
       );
 
-      // End document
       doc.end();
     } catch (error) {
       reject(error);

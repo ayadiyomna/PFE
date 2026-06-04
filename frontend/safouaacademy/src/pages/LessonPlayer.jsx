@@ -179,6 +179,11 @@ function LessonPlayer() {
   };
 
   const togglePlay = () => {
+    if (!lesson?.videoUrl) {
+      toast.error("Aucune vidéo disponible pour cette leçon.");
+      return;
+    }
+
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -470,21 +475,32 @@ function LessonPlayer() {
             
             {/* Lecteur vidéo */}
             <div className="bg-black rounded-xl overflow-hidden shadow-lg aspect-video relative group">
-              <video
-                ref={videoRef}
-                className="w-full h-full"
-                src={lesson.videoUrl}
-                poster={course.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop"}
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleLoadedMetadata}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onEnded={() => {
-                  setIsPlaying(false);
-                }}
-              />
-              
-              {!isPlaying && (
+{lesson.videoUrl ? (
+                <video
+                  ref={videoRef}
+                  className="w-full h-full"
+                  src={lesson.videoUrl}
+                  poster={course.image || "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=400&fit=crop"}
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={() => {
+                    setIsPlaying(false);
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-900 text-white p-6">
+                  <div className="text-center">
+                    <p className="text-xl font-bold">Aucune vidéo disponible</p>
+                    <p className="text-sm text-gray-200 mt-2">
+                      Cette leçon ne contient pas de source vidéo définie.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {lesson.videoUrl && !isPlaying && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                   <button 
                     onClick={togglePlay}

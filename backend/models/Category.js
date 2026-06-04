@@ -38,14 +38,13 @@ const categorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-categorySchema.pre('save', function (next) {
+categorySchema.pre('save', function () {
   if (this.isModified('nom')) {
     this.slug = this.nom
       .toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');
   }
-  next();
 });
 
 module.exports = mongoose.model('Category', categorySchema);
