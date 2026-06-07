@@ -337,18 +337,8 @@ function Home() {
                       Catalogue
                     </Link>
                   </li>
-                  <li className="transform transition-all duration-200 hover:translate-x-2">
-                    <Link to="/register" className="text-gray-400 hover:text-white transition flex items-center gap-2">
-                      <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
-                      Inscription
-                    </Link>
-                  </li>
-                  <li className="transform transition-all duration-200 hover:translate-x-2">
-                    <a href="#footer" className="text-gray-400 hover:text-white transition flex items-center gap-2">
-                      <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
-                      Contact
-                    </a>
-                  </li>
+                  
+                  
               </ul>
             </div>
 

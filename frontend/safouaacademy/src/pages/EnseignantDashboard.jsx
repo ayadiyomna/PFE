@@ -652,45 +652,46 @@ function EnseignantDashboard() {
                       <p className="text-sm text-slate-600 mb-3">La création de cours est gérée par l'administration. Si vous souhaitez créer un cours, contactez l'administrateur.</p>
                       <button onClick={() => { setShowContactModal(true); setContactResult(null); }} className="text-emerald-600 font-semibold hover:underline">Contacter l'administrateur</button>
                     </div>
-                    {showContactModal && (
-                      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
-                          <h3 className="text-lg font-bold text-slate-900 mb-3">Demande à l'administrateur</h3>
-                          <p className="text-sm text-slate-500 mb-4">Remplissez le formulaire pour demander la création d'un cours ou toute autre aide.</p>
-                          {contactResult && (
-                            <div className={`mb-3 p-3 rounded ${contactResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{contactResult.message}</div>
-                          )}
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-sm font-semibold text-slate-700">Sujet</label>
-                              <input value={contactSubject} onChange={(e) => setContactSubject(e.target.value)} placeholder="Sujet (ex: Demande création cours)" className="w-full px-3 py-2 mt-1 border rounded" />
-                            </div>
-                            <div>
-                              <label className="text-sm font-semibold text-slate-700">Message *</label>
-                              <textarea value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} rows={6} placeholder="Décrivez votre demande" className="w-full px-3 py-2 mt-1 border rounded" />
-                            </div>
-                          </div>
-                          <div className="flex gap-3 mt-4">
-                            <button disabled={contactLoading} onClick={async () => {
-                              if (!contactMessage.trim()) { setContactResult({ success: false, message: 'Le message est requis' }); return; }
-                              try {
-                                setContactLoading(true);
-                                const payload = { subject: contactSubject, message: contactMessage };
-                                const res = await api.post('/notifications/contact', payload);
-                                setContactResult({ success: true, message: res.data?.message || 'Demande envoyée' });
-                                setContactSubject(''); setContactMessage('');
-                                setTimeout(() => setShowContactModal(false), 1200);
-                              } catch (err) {
-                                setContactResult({ success: false, message: err.response?.data?.message || err.message || 'Erreur envoi' });
-                              } finally { setContactLoading(false); }
-                            }} className="flex-1 bg-emerald-600 text-white py-2 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50">{contactLoading ? 'Envoi...' : 'Envoyer la demande'}</button>
-                            <button disabled={contactLoading} onClick={() => setShowContactModal(false)} className="flex-1 border border-slate-200 py-2 rounded-xl font-semibold hover:bg-slate-50">Annuler</button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </>
                 )}
+              </div>
+            )}
+
+            {showContactModal && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+                  <h3 className="text-lg font-bold text-slate-900 mb-3">Demande à l'administrateur</h3>
+                  <p className="text-sm text-slate-500 mb-4">Remplissez le formulaire pour demander la création d'un cours ou toute autre aide.</p>
+                  {contactResult && (
+                    <div className={`mb-3 p-3 rounded ${contactResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{contactResult.message}</div>
+                  )}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-semibold text-slate-700">Sujet</label>
+                      <input value={contactSubject} onChange={(e) => setContactSubject(e.target.value)} placeholder="Sujet (ex: Demande création cours)" className="w-full px-3 py-2 mt-1 border rounded" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-slate-700">Message *</label>
+                      <textarea value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} rows={6} placeholder="Décrivez votre demande" className="w-full px-3 py-2 mt-1 border rounded" />
+                    </div>
+                  </div>
+                  <div className="flex gap-3 mt-4">
+                    <button disabled={contactLoading} onClick={async () => {
+                      if (!contactMessage.trim()) { setContactResult({ success: false, message: 'Le message est requis' }); return; }
+                      try {
+                        setContactLoading(true);
+                        const payload = { subject: contactSubject, message: contactMessage };
+                        const res = await api.post('/notifications/contact', payload);
+                        setContactResult({ success: true, message: res.data?.message || 'Demande envoyée' });
+                        setContactSubject(''); setContactMessage('');
+                        setTimeout(() => setShowContactModal(false), 1200);
+                      } catch (err) {
+                        setContactResult({ success: false, message: err.response?.data?.message || err.message || 'Erreur envoi' });
+                      } finally { setContactLoading(false); }
+                    }} className="flex-1 bg-emerald-600 text-white py-2 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50">{contactLoading ? 'Envoi...' : 'Envoyer la demande'}</button>
+                    <button disabled={contactLoading} onClick={() => setShowContactModal(false)} className="flex-1 border border-slate-200 py-2 rounded-xl font-semibold hover:bg-slate-50">Annuler</button>
+                  </div>
+                </div>
               </div>
             )}
 

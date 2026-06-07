@@ -30,7 +30,6 @@ function EnseignantCourseEditor() {
   const [selectedModuleForLesson, setSelectedModuleForLesson] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState(null);
-  const [selectedStudentForCert, setSelectedStudentForCert] = useState("");
   const [successMessage, setSuccessMessage] = useState('');
 
   // Quiz management state
@@ -327,35 +326,6 @@ function EnseignantCourseEditor() {
     }
   };
 
-  const handleGenerateCertificat = async (studentId) => {
-    // Prefer explicit studentId, fallback to selectedStudentForCert
-    const utilisateur = studentId || selectedStudentForCert;
-    if (!utilisateur) {
-      setError('Veuillez sélectionner un étudiant.');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-    // Optionally: check if utilisateur is in course.students
-    if (!course.students?.some(s => s._id === utilisateur || s.id === utilisateur)) {
-      setError('Étudiant non trouvé dans ce cours.');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-    try {
-      const res = await api.post(`/certificats/generer/${id}`, { utilisateur });
-      if (res.data?.success) {
-        showSuccess(res.data.message || 'Certificat généré avec succès');
-      } else {
-        setError(res.data?.message || 'Erreur lors de la génération');
-        setTimeout(() => setError(''), 3000);
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Erreur lors de la génération';
-      setError(msg);
-      setTimeout(() => setError(''), 3000);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -399,27 +369,6 @@ function EnseignantCourseEditor() {
                 <h1 className="text-2xl font-bold text-gray-900">{course.titre}</h1>
                 <p className="text-sm text-gray-500 mt-1">Éditeur de cours • Gérez le contenu de votre formation</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <select
-                value={selectedStudentForCert}
-                onChange={(e) => setSelectedStudentForCert(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
-              >
-                <option value="">Sélectionner un étudiant</option>
-                {course.students?.map((s) => (
-                  <option key={s._id || s.id} value={s._id || s.id}>
-                    {s.prenom} {s.nom} {s.email ? `(${s.email})` : ''}
-                  </option>
-                ))}
-              </select>
-              <button 
-                onClick={() => handleGenerateCertificat()} 
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm"
-              >
-                <Award className="w-4 h-4" />
-                Générer certificat
-              </button>
             </div>
           </div>
         </div>

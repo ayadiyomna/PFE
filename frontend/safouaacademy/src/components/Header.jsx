@@ -78,8 +78,7 @@ function Header() {
       return [
         { to: "/", label: "Accueil" },
         { to: "/cours", label: "Cours" },
-        { to: "/#contact", label: "Contact", isAnchor: true },
-        { to: "/register", label: "Inscription" }
+        
       ];
     }
 

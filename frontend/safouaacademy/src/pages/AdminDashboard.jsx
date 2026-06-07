@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import coursService from "../services/coursService";
 import authService from "../services/authService";
+import SettingsPanel from "../components/SettingsPanel";
 
 // Constantes pour les valeurs enum (doit correspondre au backend)
 const VALID_NIVEAUX = ['Débutant', 'Intermédiaire', 'Avancé', 'Expert'];
@@ -691,6 +692,7 @@ function AdminDashboard() {
             ["teachers", "Enseignants"],
             ["courses", "Cours"],
             ["categories", "Catégories"],
+            ["parametres", "Paramètres"],
             ["create-espace", "Créer Espace"]
           ].map(([key, label]) => (
             <button
@@ -1062,6 +1064,12 @@ function AdminDashboard() {
                   ))}
                 </div>
               )}
+            </section>
+          )}
+
+          {activeTab === "parametres" && (
+            <section className="bg-transparent">
+              <SettingsPanel />
             </section>
           )}
 
