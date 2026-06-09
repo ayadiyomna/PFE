@@ -89,13 +89,13 @@ router.get("/status", async (req, res) => {
 // Route principale pour envoyer un message
 router.post("/", async (req, res) => {
   let isStreaming = false;
-  
+
   try {
     const { message, history = [] } = req.body;
-    
-    console.log("📨 Message reçu:", message.substring(0, 50) + "...");
 
-    if (!message) {
+    console.log("📨 Message reçu:", (message || '').substring(0, 50) + "...");
+
+    if (!message || !message.trim()) {
       return res.status(400).json({ 
         success: false,
         error: "Message requis" 
@@ -106,26 +106,45 @@ router.post("/", async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
     res.setHeader("X-Accel-Buffering", "no"); // Désactiver le buffering pour Nginx
     res.flushHeaders();
+
+    // Envoyer un premier chunk vide pour forcer le flush (évite buffering intermédiaire)
+    try {
+      res.write(`data: ${JSON.stringify({ token: '' })}\n\n`);
+    } catch (e) {
+      console.error('Erreur en écrivant le chunk initial SSE:', e.message);
+    }
+
+    // DEBUG: indicate whether global fetch is available
+    try { res.write(`data: ${JSON.stringify({ token: `DEBUG: typeof fetch = ${typeof fetch}` })}\n\n`); } catch (e) {}
+
+    req.on("close", () => {
+      if (!res.writableEnded) {
+        console.log("⚠️ Client déconnecté (ignorer, laisser le traitement continuer).");
+      }
+    });
     
     isStreaming = true;
 
-    // Vérifier si Ollama est accessible
+    // Vérifier si Ollama est accessible (utilise fetch pour la compatibilité)
     try {
-      await axios.get("http://localhost:11434/api/tags", { timeout: 2000 });
+      const tagRes = await fetch("http://localhost:11434/api/tags");
+      if (!tagRes.ok) throw new Error(`Status ${tagRes.status}`);
     } catch (ollamaError) {
       console.error("❌ Ollama non accessible:", ollamaError.message);
       
       const errorMessageFr = "❌ Ollama n'est pas lancé. Veuillez exécuter 'ollama run llama3' dans un terminal pour démarrer l'assistant.";
       const errorMessageAr = "❌ أولاما غير مشغلة. الرجاء تشغيل 'ollama run llama3' في الطرفية لبدء المساعد.";
       
-      res.write(`data: ${JSON.stringify({ token: errorMessageFr + "\n\n───────────────\n\n" + errorMessageAr })}\n\n`);
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-      res.end();
+      try { res.write(`data: ${JSON.stringify({ token: errorMessageFr + "\n\n───────────────\n\n" + errorMessageAr })}\n\n`); } catch (e) {}
+      try { res.write(`data: ${JSON.stringify({ done: true })}\n\n`); } catch (e) {}
+      try { res.end(); } catch (e) {}
       return;
     }
+
+      // Debug: informer le client qu'Ollama est reachable
+      try { res.write(`data: ${JSON.stringify({ token: 'DEBUG: Ollama reachable' })}\n\n`); } catch(e){}
 
     // Récupérer la configuration active ou utiliser les valeurs par défaut
     let aiConfig;
@@ -142,112 +161,88 @@ router.post("/", async (req, res) => {
       maxTokens: 512
     };
 
+      // Debug: config loaded
+      try { res.write(`data: ${JSON.stringify({ token: 'DEBUG: aiConfig loaded' })}\n\n`); } catch(e){}
+
     // Construire le contexte de la conversation
-    const recentHistory = history.slice(-8); // Garder les 8 derniers messages
-    let conversationContext = "";
-    
-    if (recentHistory.length > 0) {
-      conversationContext = recentHistory
-        .map((m) => {
-          if (m.role === "user") return `Utilisateur: ${m.text}`;
-          if (m.role === "assistant") return `Assistant: ${m.text}`;
-          return "";
-        })
-        .filter(Boolean)
-        .join("\n") + "\n";
-    }
+    const recentHistory = history.slice(-4); // Garder les 4 derniers messages
+    const conversationContext = recentHistory
+      .map((m) => {
+        if (m.role === "user") return `User: ${m.text}`;
+        if (m.role === "assistant") return `Assistant: ${m.text}`;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
 
     const fullPrompt = conversationContext
-      ? `${conversationContext}Utilisateur: ${message}\nAssistant:`
-      : `Utilisateur: ${message}\nAssistant:`;
+      ? `${conversationContext}\nUser: ${message}\nAssistant:`
+      : `User: ${message}\nAssistant:`;
 
     console.log("🤖 Appel à Ollama avec modèle: llama3");
+    try { res.write(`data: ${JSON.stringify({ token: 'DEBUG: calling Ollama' })}\n\n`); } catch(e){}
 
-    // Appel à Ollama avec streaming
-    const ollamaRes = await axios.post(
-      "http://localhost:11434/api/generate",
-      {
-        model: "llama3",
+    // Appel à Ollama avec streaming via fetch (plus fiable pour les ReadableStreams)
+    const fetchBody = JSON.stringify({
+      model: "llama3",
+      system: config.systemPrompt,
+      prompt: fullPrompt,
+      stream: true,
+      options: {
+        num_predict: config.maxTokens,
+        temperature: config.temperature
+      }
+    });
+
+    // Fallback: call Ollama in non-stream mode and return full response (ensures client gets output)
+    try {
+      const nonStreamBody = JSON.stringify({
+        model: 'llama3',
         system: config.systemPrompt,
         prompt: fullPrompt,
-        stream: true,
-        options: { 
-          num_predict: config.maxTokens, 
-          temperature: config.temperature 
-        },
-      },
-      { 
-        responseType: "stream", 
-        timeout: 120000,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+        stream: false,
+        options: { num_predict: config.maxTokens, temperature: config.temperature }
+      });
 
-    let buffer = "";
-    let tokenCount = 0;
-    let sentLength = 0;
+      const resp = await fetch('http://localhost:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: nonStreamBody,
+      });
 
-    ollamaRes.data.on("data", (chunk) => {
-      buffer += chunk.toString();
-      
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.trim() === "") continue;
-        
-        try {
-          const json = JSON.parse(line);
-          
-          if (json.response) {
-            // Envoyer seulement la nouvelle partie du texte cumulatif
-            const currentLength = json.response.length;
-            if (currentLength > sentLength) {
-              const newToken = json.response.substring(sentLength);
-              tokenCount++;
-              res.write(`data: ${JSON.stringify({ token: newToken })}\n\n`);
-              sentLength = currentLength;
-            }
-          }
-          
-          if (json.done) {
-            console.log(`✅ Réponse complète envoyée (${tokenCount} tokens)`);
-            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-            res.end();
-            isStreaming = false;
-          }
-        } catch (e) {
-          console.error("❌ Erreur parsing JSON:", e.message);
-        }
-      }
-    });
-
-    ollamaRes.data.on("end", () => {
-      console.log("📡 Stream terminé");
-      if (!res.writableEnded) {
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => '');
+        console.error('Ollama non-stream error:', resp.status, t.substring(0, 200));
+        res.write(`data: ${JSON.stringify({ token: '❌ Erreur Ollama' })}\n\n`);
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         res.end();
-        isStreaming = false;
+        return;
       }
-    });
 
-    ollamaRes.data.on("error", (err) => {
-      console.error("❌ Erreur stream Ollama:", err.message);
+      const data = await resp.json().catch(() => null);
+      const answer = data?.response || (typeof data === 'string' ? data : JSON.stringify(data).substring(0, 1000));
+      res.write(`data: ${JSON.stringify({ token: answer })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+      isStreaming = false;
+      return;
+    } catch (e) {
+      console.error('Erreur fallback non-streaming Ollama:', e.message);
       if (!res.writableEnded) {
         try {
-          res.write(`data: ${JSON.stringify({ error: "Erreur de streaming" })}\n\n`);
+          res.write(`data: ${JSON.stringify({ token: '❌ Erreur interne lors de l appel à Ollama' })}\n\n`);
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
           res.end();
-        } catch (e) {
-          console.error("Erreur lors de l'envoi de l'erreur:", e);
+        } catch (ee) {
+          console.error('Erreur en renvoyant l erreur au client:', ee.message);
         }
-        isStreaming = false;
       }
-    });
+      return;
+    }
 
   } catch (err) {
     console.error("🔥 Erreur chat:", err.message);
-    
+
     if (!res.writableEnded) {
       try {
         const errorMessage = `❌ Erreur: ${err.message}\n\nVérifiez que le serveur Ollama est bien lancé.`;

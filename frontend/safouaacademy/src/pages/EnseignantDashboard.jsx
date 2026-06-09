@@ -721,14 +721,7 @@ function EnseignantDashboard() {
                           </div>
                         ) : studentsData?.etudiants && studentsData.etudiants.length > 0 ? (
                           <div>
-                            <div className="mb-4 flex justify-end">
-                              <button
-                                onClick={handleExportStudentsCSV}
-                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-semibold text-sm"
-                              >
-                                📥 Exporter en CSV
-                              </button>
-                            </div>
+                            
                             <div className="overflow-x-auto">
                               <table className="w-full text-sm">
                                 <thead>

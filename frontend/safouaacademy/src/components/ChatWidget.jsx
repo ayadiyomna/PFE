@@ -65,11 +65,12 @@ const ChatWidget = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
-    const userMessage = { 
-      role: 'user', 
+    const userMessage = {
+      role: 'user',
       text: inputMessage,
       timestamp: new Date()
     };
+
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
@@ -80,21 +81,31 @@ const ChatWidget = () => {
 
     abortControllerRef.current = new AbortController();
 
+    const historyPayload = [...messages.slice(-4), userMessage].map((m) => ({
+      role: m.role,
+      text: m.text
+    }));
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: inputMessage,
-          history: messages.slice(-8).map(m => ({
-            role: m.role,
-            text: m.text
-          }))
+          history: historyPayload
         }),
         signal: abortControllerRef.current.signal
       });
 
-      if (!response.ok) throw new Error('Erreur réseau');
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        const errorMessage = errorBody?.error || errorBody?.message || 'Erreur réseau';
+        throw new Error(errorMessage);
+      }
+
+      if (!response.body) {
+        throw new Error('Streaming non supporté par le navigateur');
+      }
 
       setMessages(prev => [...prev, { role: 'assistant', text: '', timestamp: new Date() }]);
 
@@ -111,30 +122,29 @@ const ChatWidget = () => {
         buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data.trim() === '') continue;
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6);
+          if (data.trim() === '') continue;
 
-            try {
-              const parsed = JSON.parse(data);
-              
-              if (parsed.token) {
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const lastMessage = newMessages[newMessages.length - 1];
-                  if (lastMessage.role === 'assistant') {
-                    lastMessage.text += parsed.token;
-                  }
-                  return newMessages;
-                });
-              }
+          try {
+            const parsed = JSON.parse(data);
 
-              if (parsed.done) {
-                setIsLoading(false);
-              }
-            } catch (e) {
-              console.error('Erreur parsing:', e);
+            if (parsed.token) {
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage?.role === 'assistant') {
+                  lastMessage.text += parsed.token;
+                }
+                return newMessages;
+              });
             }
+
+            if (parsed.done) {
+              setIsLoading(false);
+            }
+          } catch (e) {
+            console.error('Erreur parsing:', e);
           }
         }
       }
@@ -143,8 +153,8 @@ const ChatWidget = () => {
         console.error('Erreur:', error);
         setMessages(prev => [
           ...prev,
-          { 
-            role: 'assistant', 
+          {
+            role: 'assistant',
             text: '❌ Désolé, une erreur est survenue. Veuillez réessayer.\n\n───────────────\n\n❌ عذراً، حدث خطأ. الرجاء المحاولة مرة أخرى.',
             timestamp: new Date()
           }
